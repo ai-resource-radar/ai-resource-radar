@@ -1,0 +1,164 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
+from threading import Lock, Thread
+from typing import Any
+
+from ai_resource_radar.runtime import refresh
+from ai_resource_radar.notifications import (
+    load_pending_notifications,
+    notification_delivered,
+    notification_read,
+)
+from ai_resource_radar.pricing import list_gpu_prices, list_token_prices
+from ai_resource_radar.poster import (
+    daily_report_status,
+    generate_daily_poster,
+    latest_daily_report,
+    list_daily_reports,
+    resolve_daily_poster,
+)
+from ai_resource_radar.store import (
+    list_changes,
+    list_offers,
+    radar_summary,
+)
+
+
+@dataclass
+class AiRadarDashboard:
+    path: Path
+    _lock: Lock = field(default_factory=Lock)
+    _state: dict[str, Any] = field(
+        default_factory=lambda: {
+            "status": "idle",
+            "started_at": None,
+            "finished_at": None,
+            "report": None,
+            "error": None,
+        }
+    )
+    _poster_state: dict[str, Any] = field(
+        default_factory=lambda: {
+            "status": "idle",
+            "started_at": None,
+            "finished_at": None,
+            "report": None,
+            "error": None,
+        }
+    )
+
+    def summary(self) -> dict[str, Any]:
+        return radar_summary(self.path)
+
+    def offers(self, **filters: Any) -> tuple[dict[str, Any], ...]:
+        filters.setdefault("include_pricing", False)
+        return list_offers(self.path, **filters)
+
+    def changes(self, *, days: int, limit: int) -> tuple[dict[str, Any], ...]:
+        return list_changes(self.path, days=days, limit=limit)
+
+    def token_prices(self, **filters: Any) -> dict[str, Any]:
+        return list_token_prices(self.path, **filters)
+
+    def gpu_prices(self, **filters: Any) -> dict[str, Any]:
+        return list_gpu_prices(self.path, **filters)
+
+    def poster_latest(self) -> dict[str, Any] | None:
+        return latest_daily_report(self.path)
+
+    def poster_reports(self, *, days: int = 90) -> tuple[dict[str, Any], ...]:
+        return list_daily_reports(self.path, days=days)
+
+    def poster_image(self, report_date: str) -> Path | None:
+        return resolve_daily_poster(self.path, report_date)
+
+    def poster_status(self) -> dict[str, Any]:
+        with self._lock:
+            task = dict(self._poster_state)
+        return {**daily_report_status(self.path), "task": task}
+
+    def start_poster(self, *, force: bool = False) -> dict[str, Any] | None:
+        with self._lock:
+            if self._poster_state["status"] == "running":
+                return None
+            started = datetime.now().astimezone().isoformat(timespec="seconds")
+            self._poster_state = {
+                "status": "running",
+                "started_at": started,
+                "finished_at": None,
+                "report": None,
+                "error": None,
+            }
+        Thread(target=self._run_poster, args=(force,), daemon=True).start()
+        return self.poster_status()
+
+    def _run_poster(self, force: bool) -> None:
+        try:
+            payload = generate_daily_poster(self.path, force=force)
+            status = "completed" if payload.get("status") == "success" else "failed"
+            error = payload.get("error_code") if status == "failed" else None
+        except Exception:
+            payload = None
+            status = "failed"
+            error = "poster_generation_failed"
+        finished = datetime.now().astimezone().isoformat(timespec="seconds")
+        with self._lock:
+            self._poster_state = {
+                "status": status,
+                "started_at": self._poster_state["started_at"],
+                "finished_at": finished,
+                "report": payload,
+                "error": error,
+            }
+
+    def refresh_status(self) -> dict[str, Any]:
+        with self._lock:
+            return dict(self._state)
+
+    def start_refresh(self, *, force: bool = True) -> dict[str, Any] | None:
+        with self._lock:
+            if self._state["status"] == "running":
+                return None
+            started = datetime.now().astimezone().isoformat(timespec="seconds")
+            self._state = {
+                "status": "running",
+                "started_at": started,
+                "finished_at": None,
+                "report": None,
+                "error": None,
+            }
+        Thread(target=self._run_refresh, args=(force,), daemon=True).start()
+        return self.refresh_status()
+
+    def _run_refresh(self, force: bool) -> None:
+        try:
+            report = refresh(self.path, force=force)
+            payload = report.to_dict()
+            status = "completed" if not report.failed_count else "partial"
+            error = None
+        except Exception:
+            payload = None
+            status = "failed"
+            error = "ai_radar_refresh_failed"
+        finished = datetime.now().astimezone().isoformat(timespec="seconds")
+        with self._lock:
+            self._state = {
+                "status": status,
+                "started_at": self._state["started_at"],
+                "finished_at": finished,
+                "report": payload,
+                "error": error,
+            }
+
+    def pending_notifications(self, *, limit: int = 5) -> tuple[dict[str, Any], ...]:
+        return load_pending_notifications(self.path, limit=limit)
+
+    def mark_notification(self, notification_id: int, *, status: str) -> bool:
+        if status == "delivered":
+            return notification_delivered(self.path, notification_id)
+        if status == "read":
+            return notification_read(self.path, notification_id)
+        return False

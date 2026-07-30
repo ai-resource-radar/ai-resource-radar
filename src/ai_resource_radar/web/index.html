@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>AI 免费资源雷达</title>
+    <meta name="description" content="本地保存、官方核验的 AI 免费 Token、GPU 与资助活动">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/ai-resources.css">
+    <script src="/ai-resources.js" defer></script>
+  </head>
+  <body>
+    <header class="radar-header">
+      <div class="page-frame header-inner">
+        <div class="header-main">
+          <a class="radar-brand" href="/" aria-label="返回 AI 资源雷达">
+            <span class="radar-brand-mark" aria-hidden="true">AI</span>
+            <span>免费资源雷达</span>
+          </a>
+          <nav class="radar-nav" aria-label="AI 资源分类">
+            <button class="active" type="button" data-view="recommended">精选</button>
+            <button type="button" data-view="token">免费 Token</button>
+            <button type="button" data-view="gpu">免费 GPU</button>
+            <button type="button" data-view="token-prices">Token 价格</button>
+            <button type="button" data-view="gpu-prices">GPU 价格</button>
+            <button type="button" data-view="grant">资助</button>
+            <button type="button" data-view="poster">日报海报</button>
+            <button type="button" data-view="changes">变化</button>
+          </nav>
+        </div>
+        <div class="header-actions">
+          <span id="last-verified" class="last-verified">等待首次核验</span>
+          <span id="source-health" class="health-pill">
+            <span class="health-dot" aria-hidden="true"></span>
+            <span>读取来源状态</span>
+          </span>
+          <button id="refresh-radar" class="refresh-radar" type="button">重新核验</button>
+        </div>
+      </div>
+    </header>
+
+    <section class="page-frame radar-hero">
+      <div>
+        <p id="hero-eyebrow" class="eyebrow">TODAY'S FREE AI PICKS</p>
+        <h1 id="hero-title">今天有什么<br>值得白嫖？</h1>
+        <p id="hero-copy" class="hero-copy">先看清楚具体送什么、多久恢复、有哪些门槛，再照着操作步骤直接开始用。每项政策都保留官方核验依据。</p>
+      </div>
+      <div class="hero-pick">
+        <span id="hero-pick-label">今日首选</span>
+        <strong id="hero-pick-title">正在挑选…</strong>
+        <small id="hero-pick-note">按免费价值与使用门槛排序</small>
+      </div>
+    </section>
+
+    <section id="radar-summary" class="page-frame radar-summary" aria-live="polite">
+      <div class="ai-skeleton"></div>
+      <div class="ai-skeleton"></div>
+      <div class="ai-skeleton"></div>
+      <div class="ai-skeleton"></div>
+    </section>
+
+    <main class="page-frame radar-main">
+      <section id="featured-section" class="featured-section">
+        <div class="section-heading">
+          <div>
+            <h2>今天最值得领</h2>
+            <p>卡片直接告诉你政策内容和领取路径</p>
+          </div>
+          <button id="ranking-explainer" class="text-action" type="button">为什么推荐这些？</button>
+        </div>
+        <div id="featured-resources" class="featured-resources" aria-live="polite">
+          <div class="feature-skeleton"></div>
+          <div class="feature-skeleton"></div>
+          <div class="feature-skeleton"></div>
+        </div>
+      </section>
+
+      <section class="catalog-section">
+        <div class="section-heading">
+          <div>
+            <h2 id="catalog-title">按用途浏览</h2>
+            <p id="catalog-caption">每一项都包含免费政策、使用门槛和操作指南</p>
+          </div>
+          <button id="show-all-resources" class="text-action" type="button">查看完整目录 →</button>
+        </div>
+
+        <div class="browser-grid">
+          <section class="catalog-panel" aria-labelledby="catalog-title">
+            <div class="catalog-tools">
+              <div class="catalog-view-chips" aria-label="资源类别快捷筛选">
+                <button class="active" type="button" data-view="recommended">全部</button>
+                <button type="button" data-view="token">Token</button>
+                <button type="button" data-view="gpu">GPU</button>
+                <button type="button" data-view="token-prices">Token 价格</button>
+                <button type="button" data-view="gpu-prices">GPU 价格</button>
+                <button type="button" data-view="grant">资助</button>
+                <button type="button" data-view="poster">日报</button>
+              </div>
+              <div class="catalog-actions">
+                <label class="radar-search">
+                  <span class="sr-only">搜索供应商或资源</span>
+                  <input id="radar-query" type="search" maxlength="100" placeholder="搜索资源">
+                </label>
+                <button id="toggle-filters" class="filter-toggle" type="button" aria-expanded="false">
+                  更多筛选
+                </button>
+              </div>
+            </div>
+
+            <div id="pricing-controls" class="pricing-controls" hidden>
+              <label>
+                <span>排序</span>
+                <select id="pricing-sort" aria-label="价格排序方式"></select>
+              </label>
+              <label>
+                <span>顺序</span>
+                <select id="pricing-direction" aria-label="价格排序方向">
+                  <option value="asc">从低到高</option>
+                  <option value="desc">从高到低</option>
+                </select>
+              </label>
+              <label>
+                <span>供应商</span>
+                <select id="pricing-provider" aria-label="供应商筛选">
+                  <option value="">全部供应商</option>
+                </select>
+              </label>
+              <label class="token-price-control" hidden>
+                <span>核验级别</span>
+                <select id="token-verification" aria-label="Token 价格核验级别">
+                  <option value="all">全部价格</option>
+                  <option value="official">仅官方价格</option>
+                  <option value="community">社区价格基线</option>
+                </select>
+              </label>
+              <label class="token-price-control" hidden>
+                <span>最小上下文</span>
+                <select id="token-min-context" aria-label="最小上下文长度">
+                  <option value="">不限</option>
+                  <option value="32000">32K+</option>
+                  <option value="128000">128K+</option>
+                  <option value="200000">200K+</option>
+                  <option value="1000000">1M+</option>
+                </select>
+              </label>
+              <label class="token-price-control" hidden>
+                <span>典型成本不高于</span>
+                <input id="token-max-typical" type="number" min="0" step="0.01" inputmode="decimal" placeholder="美元">
+              </label>
+              <label class="token-price-control" hidden>
+                <span>输入价不高于</span>
+                <input id="token-max-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="$/百万">
+              </label>
+              <label class="token-price-control" hidden>
+                <span>输出价不高于</span>
+                <input id="token-max-output" type="number" min="0" step="0.01" inputmode="decimal" placeholder="$/百万">
+              </label>
+              <label class="token-price-control" hidden>
+                <span>缓存价格</span>
+                <select id="token-cache" aria-label="是否具有缓存价格">
+                  <option value="any">不限</option>
+                  <option value="yes">有缓存价格</option>
+                  <option value="no">无缓存价格</option>
+                </select>
+              </label>
+              <label id="gpu-model-control" class="gpu-price-control" hidden>
+                <span>GPU 型号</span>
+                <select id="gpu-model" aria-label="GPU 型号筛选">
+                  <option value="">全部型号</option>
+                </select>
+              </label>
+              <label class="gpu-price-control" hidden>
+                <span>最小显存</span>
+                <select id="gpu-min-vram" aria-label="最小 GPU 显存">
+                  <option value="">不限</option>
+                  <option value="24">24 GB+</option>
+                  <option value="48">48 GB+</option>
+                  <option value="80">80 GB+</option>
+                  <option value="140">140 GB+</option>
+                </select>
+              </label>
+              <label class="gpu-price-control" hidden>
+                <span>小时价不高于</span>
+                <input id="gpu-max-hourly" type="number" min="0" step="0.01" inputmode="decimal" placeholder="$/小时">
+              </label>
+              <label class="gpu-price-control" hidden>
+                <span>计费模式</span>
+                <select id="gpu-billing" aria-label="GPU 计费模式">
+                  <option value="">全部模式</option>
+                </select>
+              </label>
+              <label class="gpu-price-control" hidden>
+                <span>市场层级</span>
+                <select id="gpu-tier" aria-label="GPU 市场层级">
+                  <option value="">全部层级</option>
+                </select>
+              </label>
+              <label class="gpu-price-control" hidden>
+                <span>价格类型</span>
+                <select id="gpu-price-mode" aria-label="GPU 价格类型">
+                  <option value="all">固定价和实时价</option>
+                  <option value="fixed">仅固定价</option>
+                  <option value="dynamic_market">仅实时市场价</option>
+                </select>
+              </label>
+              <label id="gpu-hours-control" class="gpu-price-control" hidden>
+                <span>任务时长</span>
+                <select id="gpu-hours" aria-label="GPU 费用估算时长">
+                  <option value="1">1 小时</option>
+                  <option value="10" selected>10 小时</option>
+                  <option value="100">100 小时</option>
+                </select>
+              </label>
+              <button id="reset-pricing-filters" class="price-reset" type="button">重置筛选</button>
+              <button id="pricing-method" class="price-method" type="button">比较口径说明</button>
+              <div id="pricing-filter-summary" class="pricing-filter-summary" aria-live="polite"></div>
+            </div>
+
+            <div class="radar-filters" aria-label="资源过滤" hidden>
+              <label><input id="verified-only" type="checkbox" checked> 官方已核验</label>
+              <label><input id="no-card" type="checkbox" checked> 无需信用卡</label>
+              <label><input id="mainland-supported" type="checkbox" checked> 大陆可用</label>
+              <label><input id="mainland-unknown" type="checkbox" checked> 大陆情况未知</label>
+              <label><input id="mainland-unsupported" type="checkbox"> 官方不支持大陆</label>
+            </div>
+
+            <div id="refresh-state" class="refresh-state" hidden></div>
+            <div id="radar-results" class="radar-results" aria-live="polite">
+              <div class="radar-empty">正在读取本地资源库…</div>
+            </div>
+          </section>
+
+          <aside class="radar-sidebar">
+            <section class="side-card">
+              <h3>最近变化</h3>
+              <p>只显示会影响领取决策的变化</p>
+              <div id="change-preview">
+                <div class="mini-empty">正在读取变化记录…</div>
+              </div>
+              <button class="side-link" type="button" data-view="changes">查看全部变化 →</button>
+            </section>
+
+            <section class="side-card">
+              <h3>来源状态</h3>
+              <p>官方每日核验，社区目录每周刷新</p>
+              <div class="source-bar"><span id="source-health-bar"></span></div>
+              <div class="source-footer">
+                <span id="healthy-source-count">正在读取</span>
+                <span id="failed-source-count"></span>
+              </div>
+            </section>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <div id="price-compare-bar" class="price-compare-bar" hidden>
+      <span id="price-compare-count">已选择 0 项</span>
+      <div>
+        <button id="clear-price-compare" type="button">清空</button>
+        <button id="open-price-compare" class="compare-primary" type="button">开始对比</button>
+      </div>
+    </div>
+
+    <dialog id="offer-dialog" class="offer-dialog">
+      <button id="close-offer-dialog" class="dialog-close" type="button" aria-label="关闭">×</button>
+      <div id="offer-detail"></div>
+    </dialog>
+  </body>
+</html>

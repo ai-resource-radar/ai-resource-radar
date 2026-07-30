@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-resource-radar"
+version = "0.1.0"
+description = "Deterministic radar for free AI tokens, GPU compute, grants, prices, and AI-generated daily posters"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{name = "ai-resource-radar"}]
+keywords = ["ai", "gpu", "tokens", "pricing", "free-tier", "macos"]
+dependencies = ["Pillow>=10,<13"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+
+[project.urls]
+Homepage = "https://github.com/ai-resource-radar/ai-resource-radar"
+Issues = "https://github.com/ai-resource-radar/ai-resource-radar/issues"
+
+[project.scripts]
+ai-radar = "ai_resource_radar.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+ai_resource_radar = [
+  "native/*.swift",
+  "web/*.html",
+  "web/*.css",
+  "web/*.js",
+  "web/*.svg",
+]
