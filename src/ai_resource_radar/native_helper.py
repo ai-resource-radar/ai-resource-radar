@@ -3,12 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 from importlib.resources import files
-import json
 import os
 from pathlib import Path
 import platform
 import subprocess
-from typing import Any, Iterator
 
 
 @dataclass(frozen=True)
@@ -34,7 +32,7 @@ def _source_bytes(name: str) -> bytes:
 
 
 def prepare_macos_helper(
-    name: str = "macos_sampler.swift",
+    name: str,
     *,
     root: Path | None = None,
 ) -> NativeHelperStatus:
@@ -55,12 +53,21 @@ def prepare_macos_helper(
             return NativeHelperStatus(True, target)
         source_path = target.parent / name
         temporary = target.with_suffix(".tmp")
+        module_cache = target.parent / "swift-module-cache"
+        module_cache.mkdir(mode=0o700, exist_ok=True)
+        os.chmod(module_cache, 0o700)
         source_path.write_bytes(source)
         os.chmod(source_path, 0o600)
-        command = ["/usr/bin/swiftc", "-O", str(source_path), "-o", str(temporary)]
-        if name == "macos_sampler.swift":
-            command.extend(["-framework", "CoreWLAN"])
-        elif name == "macos_menubar.swift":
+        command = [
+            "/usr/bin/swiftc",
+            "-module-cache-path",
+            str(module_cache),
+            "-O",
+            str(source_path),
+            "-o",
+            str(temporary),
+        ]
+        if name == "macos_menubar.swift":
             command.extend(["-framework", "AppKit"])
         elif name == "macos_poster_ocr.swift":
             command.extend(
@@ -90,55 +97,3 @@ def prepare_macos_helper(
         return NativeHelperStatus(False, None, "helper_compile_timeout")
     except OSError:
         return NativeHelperStatus(False, None, "helper_compile_failed")
-
-
-def start_macos_sampler(
-    *,
-    duration_seconds: int,
-    resource_interval_seconds: int,
-    wifi_interval_seconds: int,
-    process_name: str,
-    interface: str | None,
-) -> tuple[subprocess.Popen[str] | None, str | None]:
-    status = prepare_macos_helper()
-    if not status.available or status.executable is None:
-        return None, status.error
-    try:
-        process = subprocess.Popen(
-            [
-                str(status.executable),
-                "--duration",
-                str(duration_seconds),
-                "--resource-interval",
-                str(resource_interval_seconds),
-                "--wifi-interval",
-                str(wifi_interval_seconds),
-                "--process",
-                process_name,
-                "--interface",
-                interface or "",
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            bufsize=1,
-        )
-        return process, None
-    except OSError:
-        return None, "helper_start_failed"
-
-
-def iter_helper_payloads(process: subprocess.Popen[str]) -> Iterator[dict[str, Any]]:
-    if process.stdout is None:
-        return
-    for line in process.stdout:
-        try:
-            payload = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(payload, dict) and payload.get("type") in {
-            "system",
-            "rate",
-            "wifi",
-        }:
-            yield payload

@@ -6,6 +6,7 @@
 
 [![CI](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/ci.yml/badge.svg)](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/ai-resource-radar/ai-resource-radar)](https://github.com/ai-resource-radar/ai-resource-radar/releases/latest)
+[![PyPI](https://img.shields.io/pypi/v/ai-resource-radar)](https://pypi.org/project/ai-resource-radar/)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/github/license/ai-resource-radar/ai-resource-radar)](LICENSE)
 
@@ -38,13 +39,12 @@ This project turns public source material into a small, explainable local databa
 
 ## Quick start
 
-Requires Python 3.11 or newer. Install the latest published wheel in an isolated environment:
+Requires Python 3.11 or newer. Install from PyPI in an isolated environment:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install \
-  https://github.com/ai-resource-radar/ai-resource-radar/releases/download/v0.1.0/ai_resource_radar-0.1.0-py3-none-any.whl
+python -m pip install ai-resource-radar
 
 ai-radar refresh
 ai-radar dashboard --open
@@ -71,7 +71,7 @@ ai-radar service uninstall
 | --- | :---: | :---: |
 | Collection, ranking, SQLite, and CLI | ✅ | ✅ |
 | Local dashboard | ✅ | ✅ |
-| GPT Image daily poster with Vision OCR | ✅ | — |
+| Provider-aware image poster with Vision OCR | ✅ | — |
 | Menu bar notifications and LaunchAgent | ✅ | — |
 
 Windows is not tested yet. Linux CI verifies the deterministic core and dashboard; macOS CI also
@@ -79,11 +79,11 @@ compiles and tests the Vision OCR and menu bar helpers.
 
 ## What it tracks
 
-The built-in adapters currently cover 14 sources:
+The built-in adapters currently cover 15 sources:
 
 | Category | Sources | Cadence |
 | --- | --- | --- |
-| Free token/API | OpenRouter, Groq, Gemini, Cloudflare Workers AI | Daily |
+| Free token/API and image generation | OpenRouter, Groq, Gemini, Cloudflare Workers AI, Zhipu CogView-3-Flash | Daily |
 | Free GPU and credits | Hugging Face ZeroGPU, Modal, Lightning AI, Kaggle, Google Colab | Daily |
 | GPU market prices | Modal, RunPod, Lambda GPU Cloud, Vast.ai | Daily |
 | Token price baseline | `pydantic/genai-prices` | Daily |
@@ -117,19 +117,26 @@ The dashboard shows the reasons instead of hiding them inside a number.
 > before using an offer.
 
 The poster model draws the complete image; the application never overlays or rewrites its text.
-The five facts are selected by deterministic code. macOS Vision then checks the title, date,
-providers, quotas, prices, and unexpected numbers.
+The five facts are selected by deterministic code. macOS Vision then checks every required title,
+provider, value, action, statistic, update time, and unexpected number.
 
 ```bash
+ai-radar poster models
+ai-radar poster configure --provider openai --model gpt-image-2 --enable
 ai-radar poster key set
 ai-radar poster generate
 ai-radar poster latest
+# Explicit one-call smoke for the keyless, non-formal ZAI model:
+ai-radar poster test-model --provider openclaw --model zai/cogview-3-flash --output ./zai-smoke.png
 ```
 
 The OpenAI key is entered with a hidden prompt and stored only in macOS Keychain. GPT Image 2
-requires paid API access. All automatic and manual operations share a hard limit of three image
-calls per day. If every candidate fails OCR, nothing is published and the last valid poster stays
-visible.
+requires paid API access. All automatic and manual formal-poster generations share a hard limit of
+three image calls per day. The explicit model smoke is restricted to keyless, non-formal models and
+never publishes a daily poster. If every candidate fails OCR, nothing is published and the last
+valid poster stays visible. OpenClaw image models can be discovered and tested through the same registry. A model is
+not eligible for the automatic Chinese daily poster until it passes the OCR benchmark; in v0.2,
+`zai/cogview-3-flash` is intentionally marked test-only for this reason.
 
 ## How it works
 
@@ -140,7 +147,7 @@ flowchart LR
     C --> D[Explainable ranking and change detection]
     D --> E[Dashboard, CLI, and local notifications]
     D --> F[Deterministic five-fact selection]
-    F --> G[Optional GPT Image poster]
+    F --> G[Optional registered image model]
     G --> H[Local Vision OCR]
     H -->|Pass| E
     H -->|Fail, max 3/day| I[Discard candidate and keep last valid poster]
@@ -166,13 +173,17 @@ ai-radar changes --days 30
 
 # Run the complete daily workflow
 ai-radar daily
+
+# Diagnose the database, source freshness, helpers, and services
+ai-radar doctor
+ai-radar doctor --json
 ```
 
 Run `ai-radar <command> --help` for every filter and option.
 
 ## Data, privacy, and storage
 
-- SQLite schema v4 uses file mode `0600`; no secrets, cookies, or account data are stored.
+- SQLite schema v5 uses file mode `0600`; no secrets, cookies, or account data are stored.
 - Full fetched pages are parsed in memory and are not archived.
 - Fetch logs are retained for 90 days; ordinary changes and delivered notifications for 365 days.
 - Important free-tier changes and unread notifications are retained.
@@ -181,6 +192,8 @@ Run `ai-radar <command> --help` for every filter and option.
 - The dashboard accepts only loopback Host/Origin requests and serves no remote assets.
 
 See [Architecture](docs/ARCHITECTURE.md) and [Security](docs/SECURITY.md) for details.
+Existing users should also read the [v0.2 migration guide](docs/MIGRATION.md); complete removal is
+documented in [Uninstall](docs/UNINSTALL.md).
 
 ## Development
 

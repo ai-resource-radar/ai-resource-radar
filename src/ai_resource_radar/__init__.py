@@ -1,3 +1,95 @@
-"""Deterministic AI resource radar with an optional AI-generated daily poster."""
+"""Stable public facade for the deterministic AI Resource Radar core."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
+
+from ai_resource_radar.doctor import DoctorCheck, DoctorReport, diagnose, run_doctor
+from ai_resource_radar.locks import (
+    OperationLock,
+    OperationLockedError,
+    operation_lock,
+    operation_lock_status,
+)
+from ai_resource_radar.model_registry import (
+    IMAGE_MODELS,
+    ImageModelSpec,
+    find_image_model,
+    get_image_model,
+)
+from ai_resource_radar.poster import (
+    OpenAIImageGenerator,
+    OpenClawImageGenerator,
+    configure_poster,
+    daily_report_status,
+    generate_daily_poster,
+    latest_daily_report,
+    list_daily_reports,
+    list_poster_models,
+    poster_configuration,
+    resolve_daily_poster,
+    test_poster_model,
+)
+from ai_resource_radar.pricing import list_gpu_prices, list_token_prices
+from ai_resource_radar.runtime import RefreshReport, refresh
+from ai_resource_radar.service import backup_database
+from ai_resource_radar.sources import (
+    OfferObservation,
+    RadarSource,
+    SOURCES,
+    normalize_modalities,
+    resolve_modalities,
+)
+from ai_resource_radar.store import (
+    SCHEMA_VERSION,
+    UnsupportedSchemaError,
+    list_changes,
+    list_offers,
+    radar_summary,
+    source_freshness_status,
+)
+
+# Concise host-facing alias; the original name remains public and compatible.
+summary = radar_summary
+
+__all__ = [
+    "__version__",
+    "SCHEMA_VERSION",
+    "UnsupportedSchemaError",
+    "DoctorCheck",
+    "DoctorReport",
+    "IMAGE_MODELS",
+    "ImageModelSpec",
+    "OfferObservation",
+    "OpenAIImageGenerator",
+    "OpenClawImageGenerator",
+    "OperationLock",
+    "OperationLockedError",
+    "RadarSource",
+    "RefreshReport",
+    "SOURCES",
+    "diagnose",
+    "backup_database",
+    "configure_poster",
+    "daily_report_status",
+    "find_image_model",
+    "generate_daily_poster",
+    "get_image_model",
+    "latest_daily_report",
+    "list_changes",
+    "list_daily_reports",
+    "list_gpu_prices",
+    "list_offers",
+    "list_token_prices",
+    "list_poster_models",
+    "normalize_modalities",
+    "operation_lock",
+    "operation_lock_status",
+    "poster_configuration",
+    "radar_summary",
+    "refresh",
+    "resolve_modalities",
+    "run_doctor",
+    "source_freshness_status",
+    "summary",
+    "test_poster_model",
+    "resolve_daily_poster",
+]

@@ -3,10 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+import sqlite3
 from threading import Lock, Thread
 from typing import Any
 
 from ai_resource_radar.runtime import refresh
+from ai_resource_radar.locks import OperationLockedError, operation_lock_status
 from ai_resource_radar.notifications import (
     load_pending_notifications,
     notification_delivered,
@@ -21,6 +23,7 @@ from ai_resource_radar.poster import (
     resolve_daily_poster,
 )
 from ai_resource_radar.store import (
+    SCHEMA_VERSION,
     list_changes,
     list_offers,
     radar_summary,
@@ -30,6 +33,7 @@ from ai_resource_radar.store import (
 @dataclass
 class AiRadarDashboard:
     path: Path
+    poster_root: Path | None = None
     _lock: Lock = field(default_factory=Lock)
     _state: dict[str, Any] = field(
         default_factory=lambda: {
@@ -53,6 +57,31 @@ class AiRadarDashboard:
     def summary(self) -> dict[str, Any]:
         return radar_summary(self.path)
 
+    def schema_error(self) -> dict[str, Any] | None:
+        if not self.path.exists():
+            return None
+        try:
+            connection = sqlite3.connect(
+                f"{self.path.resolve().as_uri()}?mode=ro",
+                uri=True,
+                timeout=2,
+            )
+            try:
+                database_version = int(
+                    connection.execute("PRAGMA user_version").fetchone()[0]
+                )
+            finally:
+                connection.close()
+        except (OSError, sqlite3.Error, TypeError, ValueError):
+            return None
+        if database_version <= SCHEMA_VERSION:
+            return None
+        return {
+            "error": "ai_radar_schema_unsupported",
+            "database_schema_version": database_version,
+            "runtime_supported_schema_version": SCHEMA_VERSION,
+        }
+
     def offers(self, **filters: Any) -> tuple[dict[str, Any], ...]:
         filters.setdefault("include_pricing", False)
         return list_offers(self.path, **filters)
@@ -73,7 +102,11 @@ class AiRadarDashboard:
         return list_daily_reports(self.path, days=days)
 
     def poster_image(self, report_date: str) -> Path | None:
-        return resolve_daily_poster(self.path, report_date)
+        return resolve_daily_poster(
+            self.path,
+            report_date,
+            poster_root=self.poster_root,
+        )
 
     def poster_status(self) -> dict[str, Any]:
         with self._lock:
@@ -82,7 +115,9 @@ class AiRadarDashboard:
 
     def start_poster(self, *, force: bool = False) -> dict[str, Any] | None:
         with self._lock:
-            if self._poster_state["status"] == "running":
+            if self._poster_state["status"] == "running" or bool(
+                operation_lock_status(self.path, "poster")["locked"]
+            ):
                 return None
             started = datetime.now().astimezone().isoformat(timespec="seconds")
             self._poster_state = {
@@ -97,9 +132,17 @@ class AiRadarDashboard:
 
     def _run_poster(self, force: bool) -> None:
         try:
-            payload = generate_daily_poster(self.path, force=force)
+            payload = generate_daily_poster(
+                self.path,
+                force=force,
+                poster_root=self.poster_root,
+            )
             status = "completed" if payload.get("status") == "success" else "failed"
             error = payload.get("error_code") if status == "failed" else None
+        except OperationLockedError as exc:
+            payload = None
+            status = "failed"
+            error = str(exc)
         except Exception:
             payload = None
             status = "failed"
@@ -120,7 +163,9 @@ class AiRadarDashboard:
 
     def start_refresh(self, *, force: bool = True) -> dict[str, Any] | None:
         with self._lock:
-            if self._state["status"] == "running":
+            if self._state["status"] == "running" or bool(
+                operation_lock_status(self.path, "refresh")["locked"]
+            ):
                 return None
             started = datetime.now().astimezone().isoformat(timespec="seconds")
             self._state = {
@@ -139,6 +184,10 @@ class AiRadarDashboard:
             payload = report.to_dict()
             status = "completed" if not report.failed_count else "partial"
             error = None
+        except OperationLockedError as exc:
+            payload = None
+            status = "failed"
+            error = str(exc)
         except Exception:
             payload = None
             status = "failed"

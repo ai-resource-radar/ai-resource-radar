@@ -13,21 +13,30 @@ from ai_resource_radar.sources import (
     OfferObservation,
     RadarSource,
     SOURCES,
+    resolve_modalities,
     official_guide,
 )
 
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 FETCH_RUN_RETENTION_DAYS = 90
 CHANGE_RETENTION_DAYS = 365
 NOTIFICATION_RETENTION_DAYS = 365
 POSTER_RETENTION_DAYS = 90
+ABANDONED_FETCH_RUN_MINUTES = 5
 VACUUM_INTERVAL_DAYS = 30
 VACUUM_MIN_FREE_BYTES = 512 * 1024
 VACUUM_MIN_FREE_RATIO = 0.20
 _VERIFICATION_RANK = {"official_api": 0, "official_page": 1, "community": 2}
 _TIER_RANK = {"A": 0, "B": 1, "C": 2, "D": 3}
 _MAINLAND_RANK = {"supported": 0, "unknown": 1, "unsupported": 2}
+
+
+class UnsupportedSchemaError(sqlite3.DatabaseError):
+    def __init__(self, database_version: int, supported_version: int) -> None:
+        super().__init__("ai_radar_schema_unsupported")
+        self.database_version = int(database_version)
+        self.supported_version = int(supported_version)
 
 
 def _json(value: Any) -> str:
@@ -88,6 +97,92 @@ def _database_bytes(connection: sqlite3.Connection) -> int:
     return page_size * page_count
 
 
+def _decode_json_list(value: Any) -> tuple[str, ...]:
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except (TypeError, ValueError):
+            return ()
+    if not isinstance(value, (list, tuple)):
+        return ()
+    return tuple(item for item in value if isinstance(item, str))
+
+
+def _backfill_modality_fields(connection: sqlite3.Connection) -> None:
+    """Populate schema-v5 modality columns without misclassifying vision.
+
+    The canonical fingerprint is recalculated so that the next successful
+    refresh does not report a synthetic update caused only by the migration.
+    """
+
+    required = {
+        "input_modalities_json",
+        "output_modalities_json",
+        "free_image_generation",
+    }
+    if not required <= _columns(connection, "offers"):
+        return
+    rows = connection.execute("SELECT * FROM offers").fetchall()
+    for row in rows:
+        try:
+            details = json.loads(row["details_json"] or "{}")
+        except (TypeError, ValueError):
+            details = {}
+        if not isinstance(details, dict):
+            details = {}
+        inputs, outputs = resolve_modalities(details)
+        inputs = inputs or _decode_json_list(row["input_modalities_json"])
+        outputs = outputs or _decode_json_list(row["output_modalities_json"])
+        free_image = (
+            str(row["kind"]) == "token"
+            and str(row["offer_type"]) in {"recurring_free", "variable_free"}
+            and "image" in outputs
+        )
+        try:
+            reasons = json.loads(row["priority_reasons_json"] or "[]")
+        except (TypeError, ValueError):
+            reasons = []
+        payload = {
+            "offer_id": row["offer_id"],
+            "provider": row["provider"],
+            "title": row["title"],
+            "kind": row["kind"],
+            "offer_type": row["offer_type"],
+            "quota_value": row["quota_value"],
+            "quota_unit": row["quota_unit"],
+            "reset_period": row["reset_period"],
+            "estimated_usd_value": row["estimated_usd_value"],
+            "requires_card": row["requires_card"],
+            "requires_phone": row["requires_phone"],
+            "eligibility": row["eligibility"],
+            "mainland_status": row["mainland_status"],
+            "expires_at": row["expires_at"],
+            "homepage_url": row["homepage_url"],
+            "verification_level": row["verification_level"],
+            "priority_tier": row["priority_tier"],
+            "priority_reasons": reasons,
+            "details": details,
+            "input_modalities": list(inputs),
+            "output_modalities": list(outputs),
+            "free_image_generation": free_image,
+        }
+        fingerprint = hashlib.sha256(_json(payload).encode()).hexdigest()
+        connection.execute(
+            """
+            UPDATE offers SET input_modalities_json = ?,
+                output_modalities_json = ?, free_image_generation = ?,
+                fingerprint = ? WHERE offer_id = ?
+            """,
+            (
+                _json(list(inputs)),
+                _json(list(outputs)),
+                int(free_image),
+                fingerprint,
+                row["offer_id"],
+            ),
+        )
+
+
 def connect(path: Path) -> sqlite3.Connection:
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     connection = sqlite3.connect(path, timeout=10)
@@ -95,7 +190,11 @@ def connect(path: Path) -> sqlite3.Connection:
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
     connection.execute("PRAGMA busy_timeout = 5000")
-    migrated = _initialize(connection)
+    try:
+        migrated = _initialize(connection)
+    except Exception:
+        connection.close()
+        raise
     if migrated:
         _try_vacuum(
             connection,
@@ -108,7 +207,7 @@ def connect(path: Path) -> sqlite3.Connection:
 def _initialize(connection: sqlite3.Connection) -> bool:
     previous_version = int(connection.execute("PRAGMA user_version").fetchone()[0])
     if previous_version > SCHEMA_VERSION:
-        raise sqlite3.DatabaseError("unsupported_ai_radar_schema")
+        raise UnsupportedSchemaError(previous_version, SCHEMA_VERSION)
     connection.executescript(
         """
         CREATE TABLE IF NOT EXISTS sources (
@@ -169,6 +268,10 @@ def _initialize(connection: sqlite3.Connection) -> bool:
             priority_tier TEXT NOT NULL,
             priority_reasons_json TEXT NOT NULL,
             details_json TEXT NOT NULL,
+            input_modalities_json TEXT NOT NULL DEFAULT '[]',
+            output_modalities_json TEXT NOT NULL DEFAULT '[]',
+            free_image_generation INTEGER NOT NULL DEFAULT 0
+                CHECK(free_image_generation IN (0, 1)),
             fingerprint TEXT NOT NULL,
             status TEXT NOT NULL DEFAULT 'active',
             first_seen_at TEXT NOT NULL,
@@ -245,6 +348,13 @@ def _initialize(connection: sqlite3.Connection) -> bool:
             ON daily_reports(status, report_date DESC);
         """
     )
+    offer_columns = _columns(connection, "offers")
+    modality_columns = {
+        "input_modalities_json",
+        "output_modalities_json",
+        "free_image_generation",
+    }
+    needs_modality_backfill = not modality_columns <= offer_columns
     changes_object = connection.execute(
         "SELECT type FROM sqlite_master WHERE name = 'changes'"
     ).fetchone()
@@ -259,7 +369,28 @@ def _initialize(connection: sqlite3.Connection) -> bool:
         )
     history_migration = 0 < previous_version < 3
     schema_migration = 0 < previous_version < SCHEMA_VERSION
+    if (
+        schema_migration or history_migration or needs_modality_backfill
+    ) and not connection.in_transaction:
+        connection.execute("BEGIN IMMEDIATE")
     with connection:
+        # ALTER, backfill, metadata and user_version form the transactional
+        # v4 -> v5 migration. SQLite rolls the whole block back on failure.
+        for name, declaration in (
+            ("input_modalities_json", "TEXT NOT NULL DEFAULT '[]'"),
+            ("output_modalities_json", "TEXT NOT NULL DEFAULT '[]'"),
+            (
+                "free_image_generation",
+                "INTEGER NOT NULL DEFAULT 0 "
+                "CHECK(free_image_generation IN (0, 1))",
+            ),
+        ):
+            if name not in offer_columns:
+                connection.execute(
+                    f"ALTER TABLE offers ADD COLUMN {name} {declaration}"
+                )
+        if schema_migration or needs_modality_backfill:
+            _backfill_modality_fields(connection)
         if history_migration:
             if changes_object is not None and changes_object["type"] == "table":
                 connection.execute("DROP TABLE changes")
@@ -317,7 +448,7 @@ def _initialize(connection: sqlite3.Connection) -> bool:
             ],
         )
         connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
-    return history_migration
+    return schema_migration or history_migration
 
 
 def source_cache(
@@ -560,7 +691,7 @@ def begin_run(
         connection.execute(
             """
             UPDATE sources
-            SET last_attempt_at = ?, last_error_code = NULL
+            SET last_attempt_at = ?
             WHERE source_id = ?
             """,
             (started_at, source_id),
@@ -664,6 +795,15 @@ def finish_failure(
 def classify_offer(observation: OfferObservation) -> tuple[str, tuple[str, ...]]:
     reasons: list[str] = []
     official = observation.verification_level in {"official_api", "official_page"}
+    _, output_modalities = resolve_modalities(
+        observation.details,
+        output_modalities=observation.output_modalities,
+    )
+    free_image_generation = (
+        observation.offer_type in {"recurring_free", "variable_free"}
+        and observation.kind == "token"
+        and "image" in output_modalities
+    )
     if observation.offer_type == "pricing_reference":
         if official:
             return "D", ("官方价格已核验；不参与免费资源等级",)
@@ -689,6 +829,8 @@ def classify_offer(observation: OfferObservation) -> tuple[str, tuple[str, ...]]
         reasons.append("免费但额度与资源动态变化")
     elif observation.offer_type == "grant":
         reasons.append("需要资格申请")
+    if free_image_generation:
+        reasons.append("免费图片输出能力已核验")
     if (
         observation.requires_card == "no"
         and observation.offer_type == "recurring_free"
@@ -708,6 +850,16 @@ def classify_offer(observation: OfferObservation) -> tuple[str, tuple[str, ...]]
 def _offer_payload(
     observation: OfferObservation, tier: str, reasons: tuple[str, ...]
 ) -> dict[str, Any]:
+    input_modalities, output_modalities = resolve_modalities(
+        observation.details,
+        input_modalities=observation.input_modalities,
+        output_modalities=observation.output_modalities,
+    )
+    free_image_generation = (
+        observation.offer_type in {"recurring_free", "variable_free"}
+        and observation.kind == "token"
+        and "image" in output_modalities
+    )
     return {
         "offer_id": observation.offer_id,
         "provider": observation.provider,
@@ -728,6 +880,9 @@ def _offer_payload(
         "priority_tier": tier,
         "priority_reasons": reasons,
         "details": observation.details,
+        "input_modalities": list(input_modalities),
+        "output_modalities": list(output_modalities),
+        "free_image_generation": free_image_generation,
     }
 
 
@@ -831,6 +986,15 @@ def ingest_source(
                         "priority_tier",
                     )
                 }
+                before["input_modalities"] = list(
+                    _decode_json_list(current["input_modalities_json"])
+                )
+                before["output_modalities"] = list(
+                    _decode_json_list(current["output_modalities_json"])
+                )
+                before["free_image_generation"] = bool(
+                    current["free_image_generation"]
+                )
                 fields = _changed_fields(before, payload)
                 if fields:
                     updated += 1
@@ -849,10 +1013,13 @@ def ingest_source(
                         quota_unit, reset_period, estimated_usd_value, requires_card,
                         requires_phone, eligibility, mainland_status, expires_at,
                         homepage_url, verification_level, priority_tier,
-                        priority_reasons_json, details_json, fingerprint, status,
+                        priority_reasons_json, details_json, input_modalities_json,
+                        output_modalities_json, free_image_generation, fingerprint,
+                        status,
                         first_seen_at, last_seen_at, last_changed_at
                     )
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                            ?, ?, ?,
                             'active', ?, ?, ?)
                     """,
                     (
@@ -875,6 +1042,9 @@ def ingest_source(
                         tier,
                         _json(reasons),
                         _json(observation.details),
+                        _json(payload["input_modalities"]),
+                        _json(payload["output_modalities"]),
+                        int(payload["free_image_generation"]),
                         fingerprint,
                         at,
                         at,
@@ -891,7 +1061,9 @@ def ingest_source(
                         requires_phone = ?, eligibility = ?, mainland_status = ?,
                         expires_at = ?, homepage_url = ?, verification_level = ?,
                         priority_tier = ?, priority_reasons_json = ?,
-                        details_json = ?, fingerprint = ?, status = 'active',
+                        details_json = ?, input_modalities_json = ?,
+                        output_modalities_json = ?, free_image_generation = ?,
+                        fingerprint = ?, status = 'active',
                         last_seen_at = ?,
                         last_changed_at = CASE WHEN fingerprint != ? OR status != 'active'
                             THEN ? ELSE last_changed_at END
@@ -916,6 +1088,9 @@ def ingest_source(
                         tier,
                         _json(reasons),
                         _json(observation.details),
+                        _json(payload["input_modalities"]),
+                        _json(payload["output_modalities"]),
+                        int(payload["free_image_generation"]),
                         fingerprint,
                         at,
                         fingerprint,
@@ -1136,6 +1311,24 @@ def _offer_dict(connection: sqlite3.Connection, row: sqlite3.Row) -> dict[str, A
         else {}
     )
     details.update(json.loads(row["details_json"]))
+    input_modalities = _decode_json_list(
+        row["input_modalities_json"] if "input_modalities_json" in row.keys() else None
+    )
+    output_modalities = _decode_json_list(
+        row["output_modalities_json"] if "output_modalities_json" in row.keys() else None
+    )
+    resolved_inputs, resolved_outputs = resolve_modalities(
+        details,
+        input_modalities=input_modalities,
+        output_modalities=output_modalities,
+    )
+    free_image_generation = (
+        bool(row["free_image_generation"]) and str(row["kind"]) == "token"
+        if "free_image_generation" in row.keys()
+        else str(row["kind"]) == "token"
+        and str(row["offer_type"]) in {"recurring_free", "variable_free"}
+        and "image" in resolved_outputs
+    )
     return {
         "offer_id": row["offer_id"],
         "external_id": row["offer_id"],
@@ -1158,6 +1351,9 @@ def _offer_dict(connection: sqlite3.Connection, row: sqlite3.Row) -> dict[str, A
         "verification_status": row["verification_level"],
         "priority_tier": row["priority_tier"],
         "priority_reasons": json.loads(row["priority_reasons_json"]),
+        "input_modalities": list(resolved_inputs),
+        "output_modalities": list(resolved_outputs),
+        "free_image_generation": free_image_generation,
         "details": details,
         "status": row["status"],
         "first_seen_at": row["first_seen_at"],
@@ -1175,6 +1371,7 @@ def list_offers(
     no_card: bool = False,
     mainland: tuple[str, ...] | None = None,
     query: str | None = None,
+    free_image_generation: bool = False,
     limit: int = 100,
     offset: int = 0,
     include_inactive: bool = False,
@@ -1201,6 +1398,8 @@ def list_offers(
             clauses.append("verification_level IN ('official_api', 'official_page')")
         if no_card:
             clauses.append("requires_card = 'no'")
+        if free_image_generation:
+            clauses.append("free_image_generation = 1")
         if mainland:
             valid = tuple(item for item in mainland if item in _MAINLAND_RANK)
             if not valid:
@@ -1237,13 +1436,154 @@ def list_offers(
         connection.close()
 
 
+SOURCE_FRESHNESS_STATES = (
+    "fresh",
+    "overdue",
+    "stale",
+    "verification_pending",
+    "failed",
+    "never",
+)
+
+
+def _source_time(value: Any, *, current: datetime) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=current.tzinfo)
+    return parsed.astimezone(current.tzinfo)
+
+
+def source_freshness_status(
+    *,
+    last_success_at: str | None,
+    cadence_hours: int,
+    last_error_code: str | None = None,
+    last_result_status: str | None = None,
+    now: datetime | None = None,
+) -> tuple[str, float | None]:
+    """Classify one source using the documented cadence-aware boundaries."""
+
+    current = (now or datetime.now().astimezone()).astimezone()
+    success = _source_time(last_success_at, current=current)
+    age_hours = (
+        max(0.0, (current - success).total_seconds() / 3600)
+        if success is not None
+        else None
+    )
+    if last_error_code:
+        if last_result_status == "verification_pending":
+            return "verification_pending", age_hours
+        return "failed", age_hours
+    if success is None:
+        return "never", None
+    assert age_hours is not None
+    cadence = max(1, int(cadence_hours))
+    if age_hours <= cadence + 6:
+        return "fresh", age_hours
+    if age_hours <= cadence * 2:
+        return "overdue", age_hours
+    return "stale", age_hours
+
+
+def source_statuses(
+    connection: sqlite3.Connection,
+    *,
+    now: datetime | None = None,
+) -> tuple[dict[str, Any], ...]:
+    current = (now or datetime.now().astimezone()).astimezone()
+    rows = connection.execute(
+        """
+        SELECT s.*,
+            (
+                SELECT f.status FROM fetch_runs f
+                WHERE f.source_id = s.source_id
+                  AND f.status IN (
+                    'success', 'not_modified', 'verification_pending', 'failed'
+                  )
+                ORDER BY f.id DESC LIMIT 1
+            ) AS last_result_status,
+            (
+                SELECT f.status FROM fetch_runs f
+                WHERE f.source_id = s.source_id
+                ORDER BY f.id DESC LIMIT 1
+            ) AS latest_run_status,
+            (
+                SELECT f.started_at FROM fetch_runs f
+                WHERE f.source_id = s.source_id
+                ORDER BY f.id DESC LIMIT 1
+            ) AS latest_run_started_at
+        FROM sources s
+        ORDER BY CASE s.authority WHEN 'community' THEN 1 ELSE 0 END,
+                 s.name COLLATE NOCASE
+        """
+    ).fetchall()
+    output: list[dict[str, Any]] = []
+    for row in rows:
+        latest_run_started_at = _source_time(
+            row["latest_run_started_at"], current=current
+        )
+        abandoned_run = (
+            row["latest_run_status"] == "running"
+            and latest_run_started_at is not None
+            and current - latest_run_started_at
+            >= timedelta(minutes=ABANDONED_FETCH_RUN_MINUTES)
+        )
+        effective_error_code = (
+            "fetch_run_abandoned" if abandoned_run else row["last_error_code"]
+        )
+        effective_result_status = (
+            "failed" if abandoned_run else row["last_result_status"]
+        )
+        status, age_hours = source_freshness_status(
+            last_success_at=row["last_success_at"],
+            cadence_hours=int(row["cadence_hours"]),
+            last_error_code=effective_error_code,
+            last_result_status=effective_result_status,
+            now=current,
+        )
+        output.append(
+            {
+                "source_id": row["source_id"],
+                "name": row["name"],
+                "authority": row["authority"],
+                "cadence_hours": int(row["cadence_hours"]),
+                "status": status,
+                "last_attempt_at": row["last_attempt_at"],
+                "last_success_at": row["last_success_at"],
+                "last_error_code": effective_error_code,
+                "age_hours": round(age_hours, 2) if age_hours is not None else None,
+            }
+        )
+    return tuple(output)
+
+
+def _empty_source_summary() -> dict[str, Any]:
+    counts = {state: 0 for state in SOURCE_FRESHNESS_STATES}
+    counts["never"] = len(SOURCES)
+    return {
+        "total": len(SOURCES),
+        "healthy": 0,
+        "failed": 0,
+        **counts,
+        "status_counts": counts,
+        "oldest_official_verified_at": None,
+        "oldest_official_age_hours": None,
+        "items": (),
+    }
+
+
 def radar_summary(path: Path, *, now: datetime | None = None) -> dict[str, Any]:
     current = (now or datetime.now().astimezone()).astimezone()
     if not path.exists():
         return {
             "schema_version": "2.0",
             "counts": {"active": 0, "tier_a": 0, "new_today": 0, "expiring": 0},
-            "sources": {"total": len(SOURCES), "healthy": 0, "failed": 0},
+            "sources": _empty_source_summary(),
             "notifications": {"unread": 0},
             "last_refresh_at": None,
             "storage": {
@@ -1280,15 +1620,23 @@ def radar_summary(path: Path, *, now: datetime | None = None) -> dict[str, Any]:
             (today, expiry),
         ).fetchone()
         source_row = connection.execute(
-            """
-            SELECT COUNT(*) AS total,
-                SUM(CASE WHEN last_success_at IS NOT NULL
-                    AND last_error_code IS NULL THEN 1 ELSE 0 END) AS healthy,
-                SUM(CASE WHEN last_error_code IS NOT NULL THEN 1 ELSE 0 END) AS failed,
-                MAX(last_attempt_at) AS last_refresh_at
-            FROM sources
-            """
+            "SELECT MAX(last_attempt_at) AS last_refresh_at FROM sources"
         ).fetchone()
+        statuses = source_statuses(connection, now=current)
+        status_counts = {
+            state: sum(item["status"] == state for item in statuses)
+            for state in SOURCE_FRESHNESS_STATES
+        }
+        official_times = [
+            parsed
+            for item in statuses
+            if item["authority"] != "community"
+            for parsed in (
+                _source_time(item["last_success_at"], current=current),
+            )
+            if parsed is not None
+        ]
+        oldest_official = min(official_times) if official_times else None
         unread = connection.execute(
             "SELECT COUNT(*) FROM notifications WHERE status != 'read'"
         ).fetchone()[0]
@@ -1301,9 +1649,31 @@ def radar_summary(path: Path, *, now: datetime | None = None) -> dict[str, Any]:
                 "expiring": int(counts["expiring"] or 0),
             },
             "sources": {
-                "total": int(source_row["total"] or 0),
-                "healthy": int(source_row["healthy"] or 0),
-                "failed": int(source_row["failed"] or 0),
+                "total": len(statuses),
+                "healthy": status_counts["fresh"],
+                "failed": (
+                    status_counts["failed"]
+                    + status_counts["verification_pending"]
+                ),
+                **status_counts,
+                "status_counts": status_counts,
+                "oldest_official_verified_at": (
+                    oldest_official.isoformat(timespec="seconds")
+                    if oldest_official
+                    else None
+                ),
+                "oldest_official_age_hours": (
+                    round(
+                        max(
+                            0.0,
+                            (current - oldest_official).total_seconds() / 3600,
+                        ),
+                        2,
+                    )
+                    if oldest_official
+                    else None
+                ),
+                "items": statuses,
             },
             "notifications": {"unread": int(unread)},
             "last_refresh_at": source_row["last_refresh_at"],

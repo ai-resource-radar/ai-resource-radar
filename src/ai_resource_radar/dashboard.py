@@ -9,6 +9,7 @@ import webbrowser
 
 from ai_resource_radar.dashboard_state import AiRadarDashboard
 from ai_resource_radar.paths import default_database_path
+from ai_resource_radar.store import UnsupportedSchemaError
 
 
 _ASSET_ROOT = Path(__file__).with_name("web")
@@ -30,7 +31,7 @@ class RadarServer(ThreadingHTTPServer):
 
 
 class RadarHandler(BaseHTTPRequestHandler):
-    server_version = "AIResourceRadar/0.1"
+    server_version = "AIResourceRadar/0.2"
     sys_version = ""
     server: RadarServer
 
@@ -94,12 +95,33 @@ class RadarHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _schema_failure(self, error: UnsupportedSchemaError) -> None:
+        self._json(
+            503,
+            {
+                "error": "ai_radar_schema_unsupported",
+                "database_schema_version": error.database_version,
+                "runtime_supported_schema_version": error.supported_version,
+            },
+        )
+
     def do_GET(self) -> None:
+        try:
+            self._do_GET()
+        except UnsupportedSchemaError as exc:
+            self._schema_failure(exc)
+
+    def _do_GET(self) -> None:
         if not self._trusted():
             return
         request_url = urlsplit(self.path)
         path = request_url.path
         query = parse_qs(request_url.query)
+        if path.startswith("/api/"):
+            schema_error = self.server.radar.schema_error()
+            if schema_error is not None:
+                self._json(503, schema_error)
+                return
         if path == "/api/ai-resources/summary":
             self._json(200, self.server.radar.summary())
             return
@@ -115,6 +137,9 @@ class RadarHandler(BaseHTTPRequestHandler):
                     kind=query.get("kind", [""])[0] or None,
                     verified_only=query.get("verified", ["false"])[0] == "true",
                     no_card=query.get("no_card", ["false"])[0] == "true",
+                    free_image_generation=(
+                        query.get("free_image_generation", ["false"])[0] == "true"
+                    ),
                     mainland=mainland,
                     query=query.get("q", [""])[0] or None,
                     limit=int(query.get("limit", ["100"])[0]),
@@ -246,9 +271,20 @@ class RadarHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self) -> None:
+        try:
+            self._do_POST()
+        except UnsupportedSchemaError as exc:
+            self._schema_failure(exc)
+
+    def _do_POST(self) -> None:
         if not self._trusted():
             return
         path = urlsplit(self.path).path
+        if path.startswith("/api/"):
+            schema_error = self.server.radar.schema_error()
+            if schema_error is not None:
+                self._json(503, schema_error)
+                return
         if (
             path not in {"/api/ai-resources/refresh", "/api/ai-daily/generate"}
             and not path.startswith("/api/ai-resources/notifications/")
@@ -324,9 +360,13 @@ def create_server(
     *,
     port: int = 18766,
     database: Path | None = None,
+    poster_root: Path | None = None,
 ) -> RadarServer:
     server = RadarServer(("127.0.0.1", port), RadarHandler)
-    server.radar = AiRadarDashboard(database or default_database_path())
+    server.radar = AiRadarDashboard(
+        database or default_database_path(),
+        poster_root=poster_root,
+    )
     return server
 
 
@@ -334,9 +374,14 @@ def serve(
     *,
     port: int = 18766,
     database: Path | None = None,
+    poster_root: Path | None = None,
     open_browser: bool = False,
 ) -> int:
-    server = create_server(port=port, database=database)
+    server = create_server(
+        port=port,
+        database=database,
+        poster_root=poster_root,
+    )
     url = f"http://127.0.0.1:{server.server_address[1]}/"
     print(f"AI 资源雷达已启动：{url}")
     if open_browser:

@@ -43,6 +43,68 @@ class OfferObservation:
     source_url: str
     evidence_excerpt: str
     details: dict[str, Any]
+    # These fields deliberately distinguish accepting images (vision input)
+    # from generating images (image output).
+    input_modalities: tuple[str, ...] = ()
+    output_modalities: tuple[str, ...] = ()
+
+
+_MODALITY_ALIASES = {
+    "images": "image",
+    "image-generation": "image",
+    "image_generation": "image",
+    "text-to-image": "image",
+    "text_to_image": "image",
+    "embedding": "embeddings",
+}
+
+
+def normalize_modalities(value: Any) -> tuple[str, ...]:
+    """Return a stable, lowercase modality tuple from catalog values."""
+
+    if value is None:
+        return ()
+    values = value if isinstance(value, (list, tuple, set)) else (value,)
+    normalized: list[str] = []
+    for item in values:
+        if not isinstance(item, str):
+            continue
+        for token in re.split(r"\s*(?:\+|,|/|\||;)\s*", item.strip()):
+            token = token.casefold().replace(" ", "-")
+            if not token:
+                continue
+            token = _MODALITY_ALIASES.get(token, token)
+            if token not in normalized:
+                normalized.append(token)
+    return tuple(normalized)
+
+
+def resolve_modalities(
+    details: dict[str, Any] | None = None,
+    *,
+    input_modalities: Any = None,
+    output_modalities: Any = None,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Resolve explicit modality fields and conservative catalog fallbacks.
+
+    A generic ``modality`` field is used only as an input hint. This prevents a
+    vision model from being incorrectly advertised as an image generator.
+    """
+
+    details = details or {}
+    inputs = normalize_modalities(input_modalities)
+    if not inputs:
+        inputs = normalize_modalities(
+            details.get("input_modalities", details.get("input_modality"))
+        )
+    if not inputs:
+        inputs = normalize_modalities(details.get("modality"))
+    outputs = normalize_modalities(output_modalities)
+    if not outputs:
+        outputs = normalize_modalities(
+            details.get("output_modalities", details.get("output_modality"))
+        )
+    return inputs, outputs
 
 
 SOURCES = (
@@ -89,6 +151,17 @@ SOURCES = (
         24,
         "html",
         ("developers.cloudflare.com",),
+    ),
+    RadarSource(
+        "zhipu-cogview-3-flash",
+        "Zhipu AI CogView-3-Flash",
+        "https://docs.bigmodel.cn/cn/guide/models/free/cogview-3-flash",
+        "official",
+        "token",
+        "official_page",
+        24,
+        "html",
+        ("docs.bigmodel.cn",),
     ),
     RadarSource(
         "huggingface-zerogpu",
@@ -269,6 +342,22 @@ OFFICIAL_GUIDES: dict[str, dict[str, Any]] = {
             "不同模型每次推理消耗的 Neurons 不同。",
         ],
     },
+    "Zhipu AI": {
+        "benefit_summary": "CogView-3-Flash 提供官方免费的文生图 API；官方未公布固定日额度，以账号速率限制为准。",
+        "best_for": "中文提示词的图片生成、原型验证和低成本 API 接入。",
+        "action_label": "打开智谱 API 控制台",
+        "action_url": "https://bigmodel.cn/usercenter/proj-mgmt/apikeys",
+        "usage_steps": [
+            "注册或登录智谱开放平台。",
+            "在 API Keys 页面创建密钥。",
+            "调用图像生成接口并选择 cogview-3-flash 模型。",
+            "在控制台查看账号当前速率限制和使用情况。",
+        ],
+        "caveats": [
+            "模型免费，但官方未公布固定每日额度。",
+            "实际可用频率以账号显示的速率限制为准。",
+        ],
+    },
     "Hugging Face": {
         "benefit_summary": "免费账号每天有 5 分钟 ZeroGPU 配额，可运行使用共享高显存 GPU 的 Space。",
         "best_for": "短时间体验图像、音频和生成式 AI Demo。",
@@ -441,6 +530,8 @@ def _official_offer(
     source_url: str,
     evidence_excerpt: str,
     details: dict[str, Any] | None = None,
+    input_modalities: Any = None,
+    output_modalities: Any = None,
 ) -> OfferObservation:
     normalized_details = (
         official_guide(provider, offer_type)
@@ -448,6 +539,11 @@ def _official_offer(
         else {}
     )
     normalized_details.update(details or {})
+    resolved_inputs, resolved_outputs = resolve_modalities(
+        normalized_details,
+        input_modalities=input_modalities,
+        output_modalities=output_modalities,
+    )
     return OfferObservation(
         offer_id=_offer_id(provider, title, kind),
         provider=provider,
@@ -470,6 +566,8 @@ def _official_offer(
         source_url=source_url,
         evidence_excerpt=evidence_excerpt[:500],
         details=normalized_details,
+        input_modalities=resolved_inputs,
+        output_modalities=resolved_outputs,
     )
 
 
@@ -515,6 +613,12 @@ def parse_openrouter(payload: bytes, source: RadarSource) -> tuple[OfferObservat
                     ),
                     "pricing": pricing,
                 },
+                input_modalities=(model.get("architecture") or {}).get(
+                    "input_modalities"
+                ),
+                output_modalities=(model.get("architecture") or {}).get(
+                    "output_modalities"
+                ),
             )
         )
     return tuple(output)
@@ -582,6 +686,40 @@ def parse_cloudflare(payload: bytes, source: RadarSource) -> tuple[OfferObservat
             mainland_status="supported",
             source_url=source.url,
             evidence_excerpt=_excerpt(text, "10,000"),
+        ),
+    )
+
+
+def parse_zhipu_cogview(
+    payload: bytes, source: RadarSource
+) -> tuple[OfferObservation, ...]:
+    text = html_text(payload)
+    # Keep the free-policy assertion tied to the model's official heading. A
+    # generic ``免费`` elsewhere in the page (for example, site navigation)
+    # must not be enough to keep an offer officially verified.
+    _require(text, "CogView-3-Flash", "免费图像生成模型")
+    return (
+        _official_offer(
+            provider="Zhipu AI",
+            title="CogView-3-Flash Free Image API",
+            kind="token",
+            offer_type="variable_free",
+            quota_value=None,
+            quota_unit="account rate limit",
+            reset_period="variable",
+            estimated_usd_value=None,
+            requires_card="no",
+            eligibility="免费，但官方未公布固定日额度，以账号速率限制为准。",
+            mainland_status="supported",
+            source_url=source.url,
+            evidence_excerpt=_excerpt(text, "CogView-3-Flash"),
+            details={
+                "model_id": "cogview-3-flash",
+                "api_endpoint": "https://open.bigmodel.cn/api/paas/v4/images/generations",
+                "quota_note": "官方未公布固定日额度，以账号速率限制为准。",
+            },
+            input_modalities=("text",),
+            output_modalities=("image",),
         ),
     )
 
@@ -1050,6 +1188,7 @@ def parse_mnfst(payload: bytes, source: RadarSource) -> tuple[OfferObservation, 
                         "max_output": model.get("maxOutput"),
                         "modality": model.get("modality"),
                     },
+                    input_modalities=model.get("modality"),
                 )
             )
     if not output:
@@ -1103,7 +1242,12 @@ def parse_prices(payload: bytes, source: RadarSource) -> tuple[OfferObservation,
                         "model_id": model["id"],
                         "prices": model.get("prices"),
                         "context_window": model.get("context_window"),
+                        "input_modalities": model.get("input_modalities"),
+                        "output_modalities": model.get("output_modalities"),
+                        "modality": model.get("modality"),
                     },
+                    input_modalities=model.get("input_modalities"),
+                    output_modalities=model.get("output_modalities"),
                 )
             )
     if not output:
@@ -1116,6 +1260,7 @@ PARSERS = {
     "groq-free-limits": parse_groq,
     "gemini-free-tier": parse_gemini,
     "cloudflare-workers-ai": parse_cloudflare,
+    "zhipu-cogview-3-flash": parse_zhipu_cogview,
     "huggingface-zerogpu": parse_huggingface,
     "modal-pricing": parse_modal,
     "runpod-gpu-pricing": parse_runpod_pricing,

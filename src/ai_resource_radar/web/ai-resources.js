@@ -9,6 +9,7 @@ const refreshState = document.querySelector("#refresh-state");
 const queryInput = document.querySelector("#radar-query");
 const verifiedOnly = document.querySelector("#verified-only");
 const noCard = document.querySelector("#no-card");
+const freeImageGeneration = document.querySelector("#free-image-generation");
 const mainlandSupported = document.querySelector("#mainland-supported");
 const mainlandUnknown = document.querySelector("#mainland-unknown");
 const mainlandUnsupported = document.querySelector("#mainland-unsupported");
@@ -207,6 +208,7 @@ function providerInitials(provider) {
 function cardBadges(resource) {
   const badges = [];
   badges.push(resource.requires_card === "no" ? ["无需信用卡", ""] : ["信用卡待确认", ""]);
+  if (resource.free_image_generation) badges.push(["免费生图", "good"]);
   if (resource.reset_period && !["unknown", "variable"].includes(resource.reset_period)) {
     badges.push([`${resetLabel(resource.reset_period)}重置`, ""]);
   }
@@ -454,16 +456,34 @@ function renderSummary(summary, officialResources) {
     metric("待处理提醒", String(summary.notifications.unread), summary.notifications.unread ? "请查看" : "暂无"),
   );
 
-  lastVerified.textContent = `${formatTime(summary.last_refresh_at)} 已核验`;
+  const sources = summary.sources || {};
+  const fresh = sources.fresh ?? sources.healthy ?? 0;
+  const overdue = sources.overdue || 0;
+  const stale = sources.stale || 0;
+  const pending = sources.verification_pending || 0;
+  const failed = sources.failed || 0;
+  const never = sources.never || 0;
+  const issueCount = overdue + stale + pending + failed + never;
+  const oldestOfficial = sources.oldest_official_verified_at || summary.last_refresh_at;
+  lastVerified.textContent = oldestOfficial
+    ? `${formatTime(oldestOfficial)} 最旧官方核验`
+    : "尚未完成官方核验";
   sourceHealth.querySelector("span:last-child").textContent =
-    `${summary.sources.healthy}/${summary.sources.total} 来源正常`;
-  sourceHealth.classList.toggle("unhealthy", summary.sources.failed > 0);
-  const healthPercent = summary.sources.total
-    ? (summary.sources.healthy / summary.sources.total) * 100
+    `${fresh}/${sources.total || 0} 来源新鲜`;
+  sourceHealth.classList.toggle("unhealthy", issueCount > 0);
+  const healthPercent = sources.total
+    ? (fresh / sources.total) * 100
     : 0;
   sourceHealthBar.style.width = `${healthPercent}%`;
-  healthySourceCount.textContent = `${summary.sources.healthy} 个来源正常`;
-  failedSourceCount.textContent = `${summary.sources.failed} 个异常`;
+  healthySourceCount.textContent = `${fresh} 个新鲜`;
+  const issueLabels = [
+    overdue ? `${overdue} 个逾期` : "",
+    stale ? `${stale} 个过期` : "",
+    pending ? `${pending} 个待核验` : "",
+    failed ? `${failed} 个失败` : "",
+    never ? `${never} 个未运行` : "",
+  ].filter(Boolean);
+  failedSourceCount.textContent = issueLabels.join(" · ") || "全部正常";
 }
 
 function importantChanges(changes) {
@@ -543,6 +563,7 @@ function resourceQuery() {
   if (currentView !== "recommended") parameters.set("kind", currentView);
   if (verifiedOnly.checked) parameters.set("verified", "true");
   if (noCard.checked) parameters.set("no_card", "true");
+  if (freeImageGeneration.checked) parameters.set("free_image_generation", "true");
   const mainland = mainlandValues();
   if (mainland.length) parameters.set("mainland", mainland.join(","));
   if (queryInput.value.trim()) parameters.set("q", queryInput.value.trim());
@@ -940,20 +961,47 @@ function posterStatusLabel(report) {
   if (report.status === "success") return "已通过 OCR 校验";
   if (report.status === "running") return "正在生成";
   return {
+    poster_disabled: "日报功能已关闭",
     poster_not_configured: "尚未配置图片 API Key",
+    poster_model_not_formal_eligible: "所选模型未通过正式日报校验",
+    poster_image_aspect_ratio_invalid: "图片比例不符合 3:4 海报要求",
     poster_daily_attempt_limit: "今日 3 次调用额度已用完",
     poster_validation_failed: "文字或数字校验未通过",
     poster_insufficient_free_offers: "可用数据不足",
   }[report.error_code] || "今日生成失败";
 }
 
-function posterMeta(report) {
+function posterReasonLabel(reason) {
+  return {
+    chinese_ocr_benchmark_failed: "中文 OCR 基准未通过",
+    openai_keychain_credential_missing: "Keychain 中没有 OpenAI 凭据",
+    openclaw_unavailable: "未找到 OpenClaw",
+    openclaw_provider_status_unavailable: "无法读取 OpenClaw 图片供应商状态",
+    openclaw_provider_zai_not_configured: "OpenClaw 尚未配置 ZAI",
+    "openclaw_model_cogview-3-flash_not_configured": "OpenClaw 未启用 CogView-3-Flash",
+    poster_model_unsupported: "当前运行版本不支持所选模型",
+  }[reason] || reason || "无";
+}
+
+function posterMeta(publishedReport, status, todayReport) {
   const meta = element("div", "poster-meta");
+  const modelProvider = publishedReport?.provider || status.provider;
+  const modelName = publishedReport?.model || status.model;
   meta.append(
-    element("span", report && report.status === "success" ? "poster-ok" : "poster-warn", posterStatusLabel(report)),
-    element("span", "", `调用 ${report?.attempt_count || 0} / 3`),
-    element("span", "", report?.generated_at ? formatTime(report.generated_at) : "等待生成"),
+    element("span", todayReport?.status === "success" ? "poster-ok" : "poster-warn", posterStatusLabel(todayReport)),
+    element("span", "", `${modelProvider} / ${modelName}`),
+    element("span", status.enabled ? "poster-ok" : "poster-warn", status.enabled ? "日报已启用" : "日报已关闭"),
+    element(
+      "span",
+      status.formal_poster_eligible ? "poster-ok" : "poster-warn",
+      status.formal_poster_eligible ? "正式日报可用" : posterReasonLabel(status.reason),
+    ),
+    element("span", "", `调用 ${todayReport?.attempt_count || 0} / 3`),
+    element("span", "", publishedReport?.generated_at ? formatTime(publishedReport.generated_at) : "等待生成"),
   );
+  if (status.last_failure?.error_code) {
+    meta.append(element("span", "poster-warn", `最近失败：${posterStatusLabel({ status: "failed", error_code: status.last_failure.error_code })}`));
+  }
   return meta;
 }
 
@@ -990,7 +1038,7 @@ async function pollPoster() {
     refreshState.hidden = false;
     refreshState.textContent = status.task?.status === "completed"
       ? "日报海报已通过校验并发布。"
-      : `日报未发布：${posterStatusLabel(status.today)}`;
+      : `日报未发布：${posterStatusLabel(status.task?.report || { status: "failed", error_code: status.task?.error })}`;
     loadPoster();
   } catch {
     refreshState.hidden = false;
@@ -1035,12 +1083,21 @@ async function loadPoster() {
     );
     const generate = element("button", "poster-generate", status.today?.status === "success" ? "重新生成" : "生成今日海报");
     generate.type = "button";
-    generate.disabled = !status.configured
+    generate.disabled = !status.enabled
+      || !status.configured
+      || !status.formal_poster_eligible
       || status.task?.status === "running"
       || (status.today?.attempt_count || 0) >= status.max_attempts_per_day;
+    generate.title = !status.enabled
+      ? "请先启用日报"
+      : !status.configured
+        ? posterReasonLabel(status.configuration_reason)
+        : !status.formal_poster_eligible
+          ? posterReasonLabel(status.reason)
+          : "生成一张经过最终 WebP OCR 校验的日报";
     generate.addEventListener("click", () => startPoster(status.today?.status === "success"));
     stageHeading.append(copy, generate);
-    stage.append(stageHeading, posterMeta(status.today));
+    stage.append(stageHeading, posterMeta(latest, status, status.today));
     if (latest?.image_url) {
       const frame = element("div", "poster-frame");
       const image = element("img");
@@ -1059,11 +1116,23 @@ async function loadPoster() {
       stage.append(frame, actions);
     } else {
       const empty = element("div", "poster-empty");
+      let emptyTitle = "今天还没有合格海报";
+      let emptyHelp = "点击生成后，图片必须通过本机 OCR 校验才会出现在这里。";
+      if (!status.enabled) {
+        emptyTitle = "日报功能当前已关闭";
+        emptyHelp = `运行：ai-radar poster configure --provider ${status.provider} --model ${status.model} --enable`;
+      } else if (!status.configured) {
+        emptyTitle = `先配置 ${status.provider} / ${status.model}`;
+        emptyHelp = status.provider === "openai"
+          ? "运行：ai-radar poster key set"
+          : `请先在 OpenClaw 配置图片供应商：${posterReasonLabel(status.configuration_reason)}`;
+      } else if (!status.formal_poster_eligible) {
+        emptyTitle = "当前模型只能用于生图测试";
+        emptyHelp = `正式日报已在调用 API 前拦截：${posterReasonLabel(status.reason)}`;
+      }
       empty.append(
-        element("strong", "", status.configured ? "今天还没有合格海报" : "先在终端配置 OpenAI API Key"),
-        element("p", "", status.configured
-          ? "点击生成后，图片必须通过本机 OCR 校验才会出现在这里。"
-          : "运行：computer-health ai-radar poster key set"),
+        element("strong", "", emptyTitle),
+        element("p", "", emptyHelp),
       );
       stage.append(empty);
     }
@@ -1203,7 +1272,7 @@ tabs.forEach((tab) => {
   tab.addEventListener("click", () => selectView(tab.dataset.view));
 });
 
-[verifiedOnly, noCard, mainlandSupported, mainlandUnknown, mainlandUnsupported]
+[verifiedOnly, noCard, freeImageGeneration, mainlandSupported, mainlandUnknown, mainlandUnsupported]
   .forEach((control) => control.addEventListener("change", loadCurrentView));
 
 queryInput.addEventListener("input", () => {
@@ -1246,6 +1315,7 @@ filterToggle.addEventListener("click", () => {
 document.querySelector("#show-all-resources").addEventListener("click", () => {
   verifiedOnly.checked = false;
   noCard.checked = false;
+  freeImageGeneration.checked = false;
   mainlandSupported.checked = true;
   mainlandUnknown.checked = true;
   mainlandUnsupported.checked = true;

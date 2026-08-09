@@ -10,6 +10,7 @@ from urllib.error import HTTPError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
+from ai_resource_radar.locks import operation_lock
 from ai_resource_radar.sources import (
     RadarSource,
     SOURCES,
@@ -31,7 +32,7 @@ from ai_resource_radar.store import (
 
 
 MAX_SOURCE_BYTES = 16 * 1024 * 1024
-USER_AGENT = "AIResourceRadar/0.1"
+USER_AGENT = "AIResourceRadar/0.2"
 
 
 @dataclass(frozen=True)
@@ -160,7 +161,7 @@ def _error_code(exc: Exception, stage: str) -> str:
     return f"{stage}_failed"
 
 
-def refresh(
+def _refresh_unlocked(
     path: Path,
     *,
     source_ids: tuple[str, ...] | None = None,
@@ -285,3 +286,27 @@ def refresh(
         notification_id=notification_id,
         maintenance=maintenance,
     )
+
+
+def refresh(
+    path: Path,
+    *,
+    source_ids: tuple[str, ...] | None = None,
+    timeout: float = 20.0,
+    force: bool = False,
+    official_only: bool = False,
+    now: datetime | None = None,
+    fetcher: Fetcher = fetch_source,
+) -> RefreshReport:
+    """Refresh selected sources while holding the cross-process DB lock."""
+
+    with operation_lock(path, "refresh"):
+        return _refresh_unlocked(
+            path,
+            source_ids=source_ids,
+            timeout=timeout,
+            force=force,
+            official_only=official_only,
+            now=now,
+            fetcher=fetcher,
+        )

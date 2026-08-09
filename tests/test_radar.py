@@ -20,6 +20,7 @@ from ai_resource_radar.sources import (
     parse_source,
 )
 from ai_resource_radar.store import (
+    SCHEMA_VERSION,
     _should_vacuum,
     begin_run,
     classify_offer,
@@ -394,7 +395,7 @@ class AiRadarV2Tests(unittest.TestCase):
             finally:
                 connection.close()
 
-            self.assertEqual(version, 4)
+            self.assertEqual(version, SCHEMA_VERSION)
         self.assertEqual(legacy, "Legacy")
         self.assertTrue({"offers", "offer_evidence", "offer_changes", "notifications"} <= tables)
         self.assertEqual(changes_type, "view")
@@ -463,7 +464,7 @@ class AiRadarV2Tests(unittest.TestCase):
             finally:
                 connection.close()
 
-            self.assertEqual(version, 4)
+            self.assertEqual(version, SCHEMA_VERSION)
         self.assertEqual(counts["offers"], 1)
         self.assertEqual(counts["offer_evidence"], 1)
         self.assertEqual(counts["fetch_runs"], 0)

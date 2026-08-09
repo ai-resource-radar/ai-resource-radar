@@ -6,6 +6,7 @@
 
 [![CI](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/ci.yml/badge.svg)](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/ai-resource-radar/ai-resource-radar)](https://github.com/ai-resource-radar/ai-resource-radar/releases/latest)
+[![PyPI](https://img.shields.io/pypi/v/ai-resource-radar)](https://pypi.org/project/ai-resource-radar/)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/github/license/ai-resource-radar/ai-resource-radar)](LICENSE)
 
@@ -37,13 +38,12 @@ AI 免费资源雷达是一个本地优先的免费政策和市场价格追踪�
 
 ## 快速开始
 
-需要 Python 3.11 或更高版本。建议在独立虚拟环境安装已发布的 wheel：
+需要 Python 3.11 或更高版本。建议在独立虚拟环境从 PyPI 安装：
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install \
-  https://github.com/ai-resource-radar/ai-resource-radar/releases/download/v0.1.0/ai_resource_radar-0.1.0-py3-none-any.whl
+python -m pip install ai-resource-radar
 
 ai-radar refresh
 ai-radar dashboard --open
@@ -70,7 +70,7 @@ ai-radar service uninstall
 | --- | :---: | :---: |
 | 采集、排序、SQLite 和 CLI | ✅ | ✅ |
 | 本地 Dashboard | ✅ | ✅ |
-| GPT Image 日报与 Vision OCR | ✅ | — |
+| 可配置图片模型日报与 Vision OCR | ✅ | — |
 | 菜单栏通知和 LaunchAgent | ✅ | — |
 
 Windows 尚未经过验证。Linux CI 会检查确定性核心和 Dashboard；macOS CI 还会编译并测试
@@ -78,11 +78,11 @@ Vision OCR 与菜单栏 Helper。
 
 ## 当前追踪范围
 
-内置适配器目前覆盖 14 个来源：
+内置适配器目前覆盖 15 个来源：
 
 | 类别 | 来源 | 周期 |
 | --- | --- | --- |
-| 免费 Token/API | OpenRouter、Groq、Gemini、Cloudflare Workers AI | 每日 |
+| 免费 Token/API 与生图 | OpenRouter、Groq、Gemini、Cloudflare Workers AI、智谱 CogView-3-Flash | 每日 |
 | 免费 GPU 与 credits | Hugging Face ZeroGPU、Modal、Lightning AI、Kaggle、Google Colab | 每日 |
 | GPU 市场价格 | Modal、RunPod、Lambda GPU Cloud、Vast.ai | 每日 |
 | Token 价格基线 | `pydantic/genai-prices` | 每日 |
@@ -114,17 +114,22 @@ Vision OCR 与菜单栏 Helper。
 > 上图已明确标注为示例数据；实际使用前始终应核对最新官方页面。
 
 图片模型负责绘制整张海报，程序不会在模型输出上覆盖或补画正文。5 项事实由确定性脚本选择，
-随后由 macOS Vision 在本地检查标题、日期、服务商、额度、价格和意外出现的数字。
+随后由 macOS Vision 在本地逐项检查标题、服务商、额度/价格、操作说明、统计值、更新时间和意外数字。
 
 ```bash
+ai-radar poster models
+ai-radar poster configure --provider openai --model gpt-image-2 --enable
 ai-radar poster key set
 ai-radar poster generate
 ai-radar poster latest
+# 对无密钥、非正式模型显式执行一次能力 smoke：
+ai-radar poster test-model --provider openclaw --model zai/cogview-3-flash --output ./zai-smoke.png
 ```
 
-OpenAI Key 通过隐藏输入写入 macOS 钥匙串。GPT Image 2 需要付费 API 访问；自动任务与手动操作
-共享每天最多 3 次图片调用的硬上限。三次 OCR 都不通过时，当日不会发布，Dashboard 会继续展示
-上一张有效海报。
+OpenAI Key 通过隐藏输入写入 macOS 钥匙串。GPT Image 2 需要付费 API 访问；自动与手动的正式海报生成
+共享每天最多 3 次图片调用的硬上限。显式模型 smoke 仅允许无密钥、非正式模型，且不会发布日报。
+三次 OCR 都不通过时，当日不会发布，Dashboard 会继续展示上一张有效海报。OpenClaw 图片模型会进入同一个模型注册表供发现和手动测试；只有通过中文 OCR
+基准的模型才允许进入自动日报。v0.2 中 `zai/cogview-3-flash` 明确标记为仅测试，不会被每日任务调用。
 
 ## 工作原理
 
@@ -135,7 +140,7 @@ flowchart LR
     C --> D[可解释排序与变化检测]
     D --> E[Dashboard、CLI 与本地通知]
     D --> F[确定性精选 5 项事实]
-    F --> G[可选 GPT Image 海报]
+    F --> G[可选已注册图片模型]
     G --> H[本地 Vision OCR]
     H -->|通过| E
     H -->|失败，每天最多 3 次| I[删除候选并保留上一张有效海报]
@@ -160,13 +165,17 @@ ai-radar changes --days 30
 
 # 执行完整每日流程
 ai-radar daily
+
+# 检查数据库、来源新鲜度、Helper 与常驻服务
+ai-radar doctor
+ai-radar doctor --json
 ```
 
 执行 `ai-radar <命令> --help` 可以查看全部筛选参数。
 
 ## 数据、隐私与存储
 
-- SQLite schema v4，数据库权限为 `0600`，不保存密钥、Cookie 或账号信息。
+- SQLite schema v5，数据库权限为 `0600`，不保存密钥、Cookie 或账号信息。
 - 完整网页只在内存中解析，不会作为历史网页归档。
 - 抓取日志保留 90 天，普通变化和已送达通知保留 365 天。
 - 重要免费政策变化和未读通知持续保留。
@@ -175,6 +184,7 @@ ai-radar daily
 - Dashboard 只接受本机 Host/Origin，静态资源全部来自本地。
 
 详细说明见[架构文档](docs/ARCHITECTURE.md)和[安全文档](docs/SECURITY.md)。
+从旧版本升级请阅读[v0.2 迁移指南](docs/MIGRATION.md)；需要彻底移除时请阅读[卸载说明](docs/UNINSTALL.md)。
 
 ## 开发
 

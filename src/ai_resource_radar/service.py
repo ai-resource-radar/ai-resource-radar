@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 import os
 from pathlib import Path
 import plistlib
+import sqlite3
 import socket
 import subprocess
 import sys
@@ -17,6 +19,8 @@ from ai_resource_radar.paths import default_database_path
 DASHBOARD_LABEL = "com.xxy.ai-resource-radar.dashboard"
 MENUBAR_LABEL = "com.xxy.ai-resource-radar.menubar"
 DAILY_LABEL = "com.xxy.ai-resource-radar.daily"
+COMPUTER_HEALTH_DAILY_LABEL = "com.xxy.computer-health-ai-radar"
+BACKUP_RETENTION_DAYS = 7
 
 
 @dataclass(frozen=True)
@@ -46,6 +50,85 @@ def _logs() -> Path:
 
 def _domain() -> str:
     return f"gui/{os.getuid()}"
+
+
+def _service_installed(label: str) -> bool:
+    if _plist_path(label).exists():
+        return True
+    return Path("/bin/launchctl").is_file() and _launchctl(
+        "print", f"{_domain()}/{label}"
+    ).returncode == 0
+
+
+def service_conflicts() -> tuple[dict[str, str], ...]:
+    conflicts: list[dict[str, str]] = []
+    if _service_installed(COMPUTER_HEALTH_DAILY_LABEL):
+        conflicts.append(
+            {
+                "label": COMPUTER_HEALTH_DAILY_LABEL,
+                "remediation": "computer-health ai-radar service uninstall",
+            }
+        )
+    return tuple(conflicts)
+
+
+def backup_database(
+    database: Path,
+    *,
+    now: datetime | None = None,
+) -> Path | None:
+    """Create and verify an online SQLite backup before service replacement."""
+
+    if not database.exists():
+        return None
+    current = (now or datetime.now().astimezone()).astimezone()
+    backup_root = database.parent / "backups"
+    backup_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(backup_root, 0o700)
+    stamp = current.strftime("%Y%m%dT%H%M%S%f%z")
+    destination = backup_root / f"{database.stem}-{stamp}{database.suffix}"
+    temporary = destination.with_suffix(f"{destination.suffix}.tmp")
+    source_connection: sqlite3.Connection | None = None
+    backup_connection: sqlite3.Connection | None = None
+    try:
+        source_connection = sqlite3.connect(
+            f"{database.resolve().as_uri()}?mode=ro", uri=True, timeout=10
+        )
+        backup_connection = sqlite3.connect(temporary, timeout=10)
+        source_connection.backup(backup_connection)
+        result = backup_connection.execute("PRAGMA integrity_check").fetchone()
+        if not result or str(result[0]).casefold() != "ok":
+            raise sqlite3.DatabaseError("ai_radar_backup_integrity_failed")
+        backup_connection.close()
+        backup_connection = None
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, destination)
+    except (OSError, sqlite3.Error) as exc:
+        temporary.unlink(missing_ok=True)
+        raise RuntimeError("ai_radar_backup_failed") from exc
+    finally:
+        if backup_connection is not None:
+            backup_connection.close()
+        if source_connection is not None:
+            source_connection.close()
+    cutoff = current - timedelta(days=BACKUP_RETENTION_DAYS)
+    for candidate in backup_root.glob(f"{database.stem}-*{database.suffix}"):
+        if candidate == destination:
+            continue
+        try:
+            modified = datetime.fromtimestamp(
+                candidate.stat().st_mtime, tz=current.tzinfo
+            )
+            if modified < cutoff:
+                candidate.unlink()
+        except OSError:
+            # Retention cleanup must not invalidate an already verified backup.
+            continue
+    return destination
+
+
+# Compatibility alias for the v0.1 internal helper name used by tests/hosts.
+_backup_database = backup_database
 
 
 def _launchctl(*arguments: str) -> subprocess.CompletedProcess[str]:
@@ -160,12 +243,20 @@ def install(
     database: Path | None = None,
 ) -> ServiceResult:
     _validate(port, hour, minute)
+    conflicts = service_conflicts()
+    if conflicts:
+        conflict = conflicts[0]
+        raise RuntimeError(
+            "ai_radar_service_conflict:"
+            f"{conflict['label']}:run {conflict['remediation']}"
+        )
     if _port_in_use(port) and not _responds(port):
         raise RuntimeError("dashboard_port_in_use")
     helper = prepare_macos_helper("macos_menubar.swift")
     if not helper.available or helper.executable is None:
         raise RuntimeError(helper.error or "menubar_helper_unavailable")
     db = database or default_database_path()
+    _backup_database(db)
     dashboard_path = _plist_path(DASHBOARD_LABEL)
     menubar_path = _plist_path(MENUBAR_LABEL)
     daily_path = _plist_path(DAILY_LABEL)
