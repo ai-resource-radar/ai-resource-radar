@@ -2,28 +2,46 @@
 
 # AI Resource Radar
 
-**Find free AI tokens and GPU compute, compare market prices, and get a verified daily briefing.**
+**Every day, verify free AI tokens, GPU compute, and price changes—see what you get and how to claim it.**
 
 [![CI](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/ci.yml/badge.svg)](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/ci.yml)
+[![Pages](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/pages.yml/badge.svg)](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/pages.yml)
 [![Release](https://img.shields.io/github/v/release/ai-resource-radar/ai-resource-radar)](https://github.com/ai-resource-radar/ai-resource-radar/releases/latest)
 [![PyPI](https://img.shields.io/pypi/v/ai-resource-radar)](https://pypi.org/project/ai-resource-radar/)
+[![Public site](https://img.shields.io/website?url=https%3A%2F%2Fai-resource-radar.github.io%2Fai-resource-radar%2F)](https://ai-resource-radar.github.io/ai-resource-radar/)
+[![Source freshness](https://img.shields.io/endpoint?url=https%3A%2F%2Fai-resource-radar.github.io%2Fai-resource-radar%2Fdata%2Fbadges%2Fsources.json)](https://ai-resource-radar.github.io/ai-resource-radar/data/source-health.json)
+[![Coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fai-resource-radar.github.io%2Fai-resource-radar%2Fdata%2Fbadges%2Fcoverage.json)](https://ai-resource-radar.github.io/ai-resource-radar/data/resources.json)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/github/license/ai-resource-radar/ai-resource-radar)](LICENSE)
 
-[中文](README.zh-CN.md) · [Quick start](#quick-start) · [How it works](#how-it-works) · [Security](docs/SECURITY.md)
+[Live Radar](https://ai-resource-radar.github.io/ai-resource-radar/) · [Data](https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json) · [Start with uvx](#start-with-uvx) · [中文](README.zh-CN.md)
+
+[How it works](#how-it-works) · [Public-site contract](docs/PUBLIC_SITE.md) · [Security](docs/SECURITY.md)
 
 </div>
 
-![AI Resource Radar dashboard](docs/assets/dashboard.png)
+![AI Resource Radar public radar](docs/assets/public-radar.png)
 
-AI Resource Radar is a local-first tracker for AI free tiers and market prices. It tells you
-**what is free, how much you get, when it resets, what the restrictions are, and how to claim it**.
-Every recommendation keeps its source and verification time.
+AI Resource Radar is a local-first tracker for free AI tiers, GPU compute, grants, and prices. It
+keeps the source and verification time beside each result, so the answer is practical: **what is
+free, how much you get, when it resets, what the restrictions are, and how to claim it**.
 
 The default collection pipeline is deterministic: **no AI, API key, cookie, or account data is
 required**. AI is used only by the optional daily poster.
 
-## Why this project
+## Start with uvx
+
+Try the keyless collector without creating a checkout or virtual environment:
+
+```bash
+uvx ai-resource-radar start --open
+```
+
+For the hosted snapshot, use [Live Radar](https://ai-resource-radar.github.io/ai-resource-radar/) or fetch
+the documented [public data manifest](https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json).
+The public site is an aggregate view; always follow an official source before relying on an offer.
+
+## What you get
 
 Free tiers and AI prices change frequently, while ordinary link lists quickly become stale.
 This project turns public source material into a small, explainable local database:
@@ -36,6 +54,7 @@ This project turns public source material into a small, explainable local databa
 | GPU price leaderboard | On-demand GPU prices normalized per hour for practical comparison |
 | Change detection | New offers, quota or restriction changes, removals, and upcoming expiry |
 | Daily poster | Three free resources plus one token and one GPU price, drawn as one image and checked by local OCR |
+| AI efficiency tips | Official guidance and manual articles stay pending until a human approves safe AGENTS.md application |
 
 ## Quick start
 
@@ -107,7 +126,9 @@ The radar deliberately avoids an opaque score:
 Within a tier, results are ordered by mainland availability, estimated value, and recent changes.
 The dashboard shows the reasons instead of hiding them inside a number.
 
-## Daily poster
+## Optional extensions
+
+### Daily poster
 
 <p align="center">
   <img src="docs/assets/poster-sample.webp" width="420" alt="Example AI Resource Radar daily poster">
@@ -135,8 +156,15 @@ requires paid API access. All automatic and manual formal-poster generations sha
 three image calls per day. The explicit model smoke is restricted to keyless, non-formal models and
 never publishes a daily poster. If every candidate fails OCR, nothing is published and the last
 valid poster stays visible. OpenClaw image models can be discovered and tested through the same registry. A model is
-not eligible for the automatic Chinese daily poster until it passes the OCR benchmark; in v0.2,
+not eligible for the automatic Chinese daily poster until it passes the OCR benchmark; in v0.3,
 `zai/cogview-3-flash` is intentionally marked test-only for this reason.
+
+### AI efficiency tips
+
+Official guidance and manually imported articles remain candidates until a human approves them.
+Approval is limited to the marked managed block in an `AGENTS.md`, creates a private backup, and is
+auditable and reversible. See [docs/TIPS.md](docs/TIPS.md) for the safety model and
+`ai-radar tips --help` for the CLI.
 
 ## How it works
 
@@ -183,7 +211,8 @@ Run `ai-radar <command> --help` for every filter and option.
 
 ## Data, privacy, and storage
 
-- SQLite schema v5 uses file mode `0600`; no secrets, cookies, or account data are stored.
+- SQLite schema v6 uses file mode `0600`; no secrets, cookies, or account data are stored.
+- Tips retain only bounded summaries and evidence. Approval updates only the marked AGENTS.md managed block and creates a private backup under `~/.codex/backups/ai-tips/`.
 - Full fetched pages are parsed in memory and are not archived.
 - Fetch logs are retained for 90 days; ordinary changes and delivered notifications for 365 days.
 - Important free-tier changes and unread notifications are retained.

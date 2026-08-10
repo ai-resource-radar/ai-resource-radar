@@ -2,27 +2,45 @@
 
 # AI 免费资源雷达
 
-**每天核验 AI 免费 Token、GPU 算力和市场价格，生成可解释的本地榜单与中文日报。**
+**每天核验免费 AI Token、GPU 算力和价格变化，告诉你送什么、怎么领。**
 
 [![CI](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/ci.yml/badge.svg)](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/ci.yml)
+[![Pages](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/pages.yml/badge.svg)](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/pages.yml)
 [![Release](https://img.shields.io/github/v/release/ai-resource-radar/ai-resource-radar)](https://github.com/ai-resource-radar/ai-resource-radar/releases/latest)
 [![PyPI](https://img.shields.io/pypi/v/ai-resource-radar)](https://pypi.org/project/ai-resource-radar/)
+[![Public site](https://img.shields.io/website?url=https%3A%2F%2Fai-resource-radar.github.io%2Fai-resource-radar%2F)](https://ai-resource-radar.github.io/ai-resource-radar/)
+[![Source freshness](https://img.shields.io/endpoint?url=https%3A%2F%2Fai-resource-radar.github.io%2Fai-resource-radar%2Fdata%2Fbadges%2Fsources.json)](https://ai-resource-radar.github.io/ai-resource-radar/data/source-health.json)
+[![Coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fai-resource-radar.github.io%2Fai-resource-radar%2Fdata%2Fbadges%2Fcoverage.json)](https://ai-resource-radar.github.io/ai-resource-radar/data/resources.json)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/github/license/ai-resource-radar/ai-resource-radar)](LICENSE)
 
-[English](README.md) · [快速开始](#快速开始) · [工作原理](#工作原理) · [安全说明](docs/SECURITY.md)
+[Live Radar](https://ai-resource-radar.github.io/ai-resource-radar/) · [Data](https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json) · [uvx 开始](#用-uvx-开始) · [English](README.md)
+
+[工作原理](#工作原理) · [公开站点说明](docs/PUBLIC_SITE.md) · [安全说明](docs/SECURITY.md)
 
 </div>
 
-![AI 免费资源雷达 Dashboard](docs/assets/dashboard.png)
+![AI 免费资源雷达公开站点](docs/assets/public-radar.png)
 
-AI 免费资源雷达是一个本地优先的免费政策和市场价格追踪器。它不只给出链接，还会直接说明
-**送什么、送多少、多久恢复、有哪些门槛，以及怎样开始使用**。每项推荐都保留来源与核验时间。
+AI 免费资源雷达是一个本地优先的免费 Token、GPU 算力、资助和价格追踪器。不只给出链接，还会直接说明
+**送什么、送多少、多久恢复、有哪些门槛，以及怎样开始使用**；每项结果都保留来源与核验时间。
 
 默认采集链路完全由确定性脚本执行，**不调用 AI，不需要 API Key、Cookie 或账号信息**。
 只有可选的日报海报会使用图片模型。
 
-## 为什么做这个项目
+## 用 uvx 开始
+
+不用先创建代码目录或虚拟环境，即可试用无密钥采集：
+
+```bash
+uvx ai-resource-radar start --open
+```
+
+也可以直接打开 [Live Radar](https://ai-resource-radar.github.io/ai-resource-radar/)，或下载有版本说明的
+[公开数据清单](https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json)。公开站点只是聚合视图，
+实际使用前仍应打开官方来源核对政策。
+
+## 你能得到什么
 
 免费额度和 AI 价格经常变化，普通收藏夹或链接目录很快就会过期。本项目把公开资料整理成一个
 小型、可解释、可维护的本地数据库：
@@ -35,6 +53,7 @@ AI 免费资源雷达是一个本地优先的免费政策和市场价格追踪�
 | GPU 价格榜 | 统一折算按需 GPU 小时价，方便横向比较 |
 | 变化检测 | 新增、额度变化、限制变化、下架和即将到期 |
 | 日报海报 | 3 项免费资源、1 项 Token 价格和 1 项 GPU 价格，整图生成并在本地 OCR 核验 |
+| AI 效率技巧 | 官方技巧与手动文章先进入候选，人工批准后安全写入全局或项目 AGENTS.md |
 
 ## 快速开始
 
@@ -105,7 +124,9 @@ Vision OCR 与菜单栏 Helper。
 同等级按照大陆支持情况、估算价值和最近变化排序。Dashboard 会展示具体理由，而不是只给一个
 无法解释的数字。
 
-## 纯图片日报
+## 可选扩展
+
+### 纯图片日报
 
 <p align="center">
   <img src="docs/assets/poster-sample.webp" width="420" alt="AI 免费资源雷达示例日报">
@@ -129,7 +150,13 @@ ai-radar poster test-model --provider openclaw --model zai/cogview-3-flash --out
 OpenAI Key 通过隐藏输入写入 macOS 钥匙串。GPT Image 2 需要付费 API 访问；自动与手动的正式海报生成
 共享每天最多 3 次图片调用的硬上限。显式模型 smoke 仅允许无密钥、非正式模型，且不会发布日报。
 三次 OCR 都不通过时，当日不会发布，Dashboard 会继续展示上一张有效海报。OpenClaw 图片模型会进入同一个模型注册表供发现和手动测试；只有通过中文 OCR
-基准的模型才允许进入自动日报。v0.2 中 `zai/cogview-3-flash` 明确标记为仅测试，不会被每日任务调用。
+基准的模型才允许进入自动日报。v0.3 中 `zai/cogview-3-flash` 明确标记为仅测试，不会被每日任务调用。
+
+### AI 效率技巧
+
+官方指南和手动导入的文章会先保持候选状态，必须人工批准后才会写入 `AGENTS.md` 的标记区块。
+每次应用都会创建私有备份，并支持审计和回滚。安全模型见[技巧说明](docs/TIPS.md)，命令行可运行
+`ai-radar tips --help` 查看详情。
 
 ## 工作原理
 
@@ -169,13 +196,22 @@ ai-radar daily
 # 检查数据库、来源新鲜度、Helper 与常驻服务
 ai-radar doctor
 ai-radar doctor --json
+
+# 查看、导入、批准和回滚效率技巧
+ai-radar tips list --status candidate
+ai-radar tips refresh
+ai-radar tips import --url https://example.com/tip --title "标题" --category context --summary "摘要" --instruction "具体做法"
+ai-radar tips approve <tip-id> --scope global
+ai-radar tips applications
+ai-radar tips rollback <application-id>
 ```
 
 执行 `ai-radar <命令> --help` 可以查看全部筛选参数。
 
 ## 数据、隐私与存储
 
-- SQLite schema v5，数据库权限为 `0600`，不保存密钥、Cookie 或账号信息。
+- SQLite schema v6，数据库权限为 `0600`，不保存密钥、Cookie 或账号信息。
+- 效率技巧只保存短摘要和必要证据；全部需要人工批准。批准后仅更新带标记的 AGENTS.md 受管区块，并在 `~/.codex/backups/ai-tips/` 创建私有备份。
 - 完整网页只在内存中解析，不会作为历史网页归档。
 - 抓取日志保留 90 天，普通变化和已送达通知保留 365 天。
 - 重要免费政策变化和未读通知持续保留。

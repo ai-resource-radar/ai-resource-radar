@@ -22,6 +22,7 @@ jobs:
       - run: python -m unittest discover -s tests -p 'test_*.py'
       - run: python -m compileall -q src
       - run: node --check src/ai_resource_radar/web/ai-resources.js
+      - run: node --check src/ai_resource_radar/public_web/app.js
 
   macos:
     runs-on: macos-latest
@@ -66,7 +67,15 @@ jobs:
           /tmp/ai-radar-wheel-smoke/bin/python -m pip install --upgrade pip
           /tmp/ai-radar-wheel-smoke/bin/python -m pip install dist/*.whl
           /tmp/ai-radar-wheel-smoke/bin/ai-radar --help
+          /tmp/ai-radar-wheel-smoke/bin/ai-radar site --help
+          /tmp/ai-radar-wheel-smoke/bin/ai-resource-radar start --help
           /tmp/ai-radar-wheel-smoke/bin/ai-radar poster models --json
+          /tmp/ai-radar-wheel-smoke/bin/python - <<'PY'
+          from importlib.resources import files
+          root = files("ai_resource_radar").joinpath("public_web")
+          for name in ("index.html", "styles.css", "app.js"):
+              assert root.joinpath(name).is_file(), name
+          PY
       - name: Create checksums
         run: |
           (cd dist && sha256sum *.whl *.tar.gz > SHA256SUMS)

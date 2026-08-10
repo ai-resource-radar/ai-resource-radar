@@ -60,13 +60,14 @@ const browserGrid = document.querySelector(".browser-grid");
 const radarSidebar = document.querySelector(".radar-sidebar");
 
 const knownViews = new Set([
-  "recommended", "token", "gpu", "token-prices", "gpu-prices", "grant", "poster", "changes",
+  "recommended", "token", "gpu", "token-prices", "gpu-prices", "grant", "poster", "tips", "changes",
 ]);
 const hashView = window.location.hash.replace("#", "");
 let currentView = knownViews.has(hashView) ? hashView : "recommended";
 let searchTimer = null;
 let refreshTimer = null;
 const comparedPrices = new Map();
+const tipFilters = { status: "", category: "", risk: "", source: "", scope: "" };
 
 function element(tag, className, text) {
   const node = document.createElement(tag);
@@ -927,7 +928,15 @@ function configurePricingControls() {
 }
 
 function updateHero() {
-  if (currentView === "poster") {
+  queryInput.placeholder = currentView === "tips" ? "搜索技巧" : "搜索资源";
+  if (currentView === "tips") {
+    heroEyebrow.textContent = "AI PRODUCTIVITY PLAYBOOK";
+    heroTitle.replaceChildren("把好方法，", element("br"), "变成可复用规则");
+    heroCopy.textContent = "官方技巧和手动导入内容先进入候选库。只有人工批准后，才会写入受管 AGENTS.md 区块并影响之后的新任务。";
+    heroPickLabel.textContent = "安全原则";
+    heroPickTitle.textContent = "先审核，再吸收";
+    heroPickNote.textContent = "每次写入均备份、记录哈希并支持回滚";
+  } else if (currentView === "poster") {
     heroEyebrow.textContent = "AI-GENERATED DAILY POSTER";
     heroTitle.replaceChildren("每天一张，", element("br"), "AI 资源情报海报");
     heroCopy.textContent = "海报由图片模型整张生成，再由本机 OCR 核对服务商、免费额度和价格数字。校验不通过就不会发布。";
@@ -1181,26 +1190,267 @@ async function loadChanges() {
   }
 }
 
+const tipCategoryLabels = {
+  delegation: "委派协作", prompting: "提示词", context: "上下文",
+  verification: "测试验证", cost: "成本控制", security: "安全",
+};
+
+function tipStatusLabel(value) {
+  return { candidate: "待审核", approved: "已批准", rejected: "已拒绝", retired: "已撤回" }[value] || value;
+}
+
+async function reviewTip(tipId, action, scope) {
+  try {
+    await fetchJson(`/api/ai-tips/${encodeURIComponent(tipId)}/review`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ...(scope ? { scope } : {}) }),
+    });
+    dialog.close();
+    await loadTips();
+  } catch (error) {
+    detailRoot.append(element("p", "tip-error", `操作失败：${error.message}`));
+  }
+}
+
+function openTip(tip) {
+  detailRoot.replaceChildren(
+    element("span", "tip-status", `${tipStatusLabel(tip.status)} · ${tipCategoryLabels[tip.category] || tip.category}`),
+    element("h2", "", tip.title),
+    element("p", "offer-provider", tip.summary),
+  );
+  const instruction = element("section", "policy-note");
+  instruction.append(element("strong", "", "具体做法"), element("p", "", tip.instruction));
+  detailRoot.append(instruction);
+  if (tip.example) {
+    const example = element("section", "policy-note");
+    example.append(element("strong", "", "示例"), element("p", "", tip.example));
+    detailRoot.append(example);
+  }
+  if (Array.isArray(tip.constraints) && tip.constraints.length) {
+    const limits = element("section", "evidence-box");
+    limits.append(element("strong", "", "边界与风险"));
+    tip.constraints.forEach((item) => limits.append(element("p", "", `• ${item}`)));
+    detailRoot.append(limits);
+  }
+  const evidence = element("section", "policy-note");
+  evidence.append(element("strong", "", tip.source_type === "official" ? "官方证据" : "手动来源"));
+  evidence.append(element("p", "", tip.evidence_summary || "仅保存结构化摘要，原文需通过来源链接复核。"));
+  const link = safeLink("查看来源 ↗", tip.source_url, "price-source-link");
+  if (link) evidence.append(link);
+  detailRoot.append(evidence);
+  if (tip.status === "candidate") {
+    const actions = element("div", "tip-review-actions");
+    [["global", "批准并应用到全局"], ["project", "应用到当前项目"], ["both", "同时应用"]].forEach(([scope, label]) => {
+      const button = element("button", "tip-approve", label);
+      button.type = "button";
+      button.addEventListener("click", () => reviewTip(tip.tip_id, "approve", scope));
+      actions.append(button);
+    });
+    const reject = element("button", "tip-reject", "拒绝候选");
+    reject.type = "button";
+    reject.addEventListener("click", () => reviewTip(tip.tip_id, "reject"));
+    actions.append(reject);
+    detailRoot.append(actions);
+  }
+  openDialog();
+}
+
+function tipCard(tip) {
+  const card = element("article", "tip-card");
+  card.tabIndex = 0;
+  card.append(
+    element("span", `tip-status ${tip.status}`, `${tipStatusLabel(tip.status)} · ${tipCategoryLabels[tip.category] || tip.category}`),
+    element("h3", "", tip.title),
+    element("p", "", tip.summary),
+    element("small", "", `${tip.source_type === "official" ? "官方来源" : "手动导入"} · 风险 ${tip.risk_level}`),
+  );
+  card.addEventListener("click", () => openTip(tip));
+  card.addEventListener("keydown", (event) => { if (event.key === "Enter") openTip(tip); });
+  return card;
+}
+
+function tipFilterSelect(label, key, options) {
+  const wrapper = element("label", "tip-filter");
+  wrapper.append(element("span", "", label));
+  const select = element("select");
+  options.forEach(([value, text]) => select.append(new Option(text, value)));
+  select.value = tipFilters[key];
+  select.addEventListener("change", () => {
+    tipFilters[key] = select.value;
+    loadTips();
+  });
+  wrapper.append(select);
+  return wrapper;
+}
+
+function tipImportField(label, name, { multiline = false, type = "text" } = {}) {
+  const wrapper = element("label", "tip-import-field");
+  wrapper.append(element("span", "", label));
+  const input = element(multiline ? "textarea" : "input");
+  input.name = name;
+  if (!multiline) input.type = type;
+  input.required = true;
+  wrapper.append(input);
+  return [wrapper, input];
+}
+
+function openTipImport() {
+  detailRoot.replaceChildren(
+    element("h2", "", "手动导入效率技巧"),
+    element("p", "offer-provider", "只保存结构化摘要，不抓取或归档完整网页；导入后仍需人工批准。"),
+  );
+  const form = element("form", "tip-import-form");
+  const [urlField, url] = tipImportField("来源 HTTPS URL", "source_url", { type: "url" });
+  const [titleField, title] = tipImportField("标题", "title");
+  const categoryField = element("label", "tip-import-field");
+  categoryField.append(element("span", "", "分类"));
+  const category = element("select");
+  Object.entries(tipCategoryLabels).forEach(([value, label]) => category.append(new Option(label, value)));
+  categoryField.append(category);
+  const [summaryField, summary] = tipImportField("短摘要", "summary", { multiline: true });
+  const [instructionField, instruction] = tipImportField("审核后将写入的具体做法", "instruction", { multiline: true });
+  const [exampleField, example] = tipImportField("示例", "example", { multiline: true });
+  example.required = false;
+  const submit = element("button", "tip-approve", "保存为待审核候选");
+  submit.type = "submit";
+  form.append(urlField, titleField, categoryField, summaryField, instructionField, exampleField, submit);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    submit.disabled = true;
+    try {
+      await fetchJson("/api/ai-tips/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source_url: url.value, title: title.value, category: category.value,
+          summary: summary.value, instruction: instruction.value, example: example.value,
+          source_type: "manual", risk_level: "medium",
+        }),
+      });
+      dialog.close();
+      await loadTips();
+    } catch (error) {
+      submit.disabled = false;
+      form.append(element("p", "tip-error", `导入失败：${error.message}`));
+    }
+  });
+  detailRoot.append(form);
+  openDialog();
+}
+
+async function rollbackTip(applicationId) {
+  await fetchJson(`/api/ai-tips/applications/${applicationId}/rollback`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+  });
+  await loadTips();
+}
+
+async function loadTips() {
+  resultsRoot.replaceChildren(element("div", "radar-empty", "正在读取效率技巧…"));
+  try {
+    const parameters = new URLSearchParams({ limit: "200" });
+    if (queryInput.value.trim()) parameters.set("q", queryInput.value.trim());
+    Object.entries(tipFilters).forEach(([key, value]) => {
+      if (value) parameters.set(key, value);
+    });
+    const [summary, payload, applications] = await Promise.all([
+      fetchJson("/api/ai-tips/summary"),
+      fetchJson(`/api/ai-tips?${parameters}`),
+      fetchJson("/api/ai-tips/applications?limit=20"),
+    ]);
+    const root = element("div", "tips-workspace");
+    const controls = element("div", "tip-filter-bar");
+    controls.append(
+      tipFilterSelect("状态", "status", [["", "全部"], ["candidate", "待审核"], ["approved", "已批准"], ["rejected", "已拒绝"], ["retired", "已撤回"]]),
+      tipFilterSelect("分类", "category", [["", "全部"], ["delegation", "委派协作"], ["prompting", "提示词"], ["context", "上下文"], ["verification", "测试验证"], ["cost", "成本控制"], ["security", "安全"]]),
+      tipFilterSelect("风险", "risk", [["", "全部"], ["low", "低"], ["medium", "中"], ["high", "高"]]),
+      tipFilterSelect("来源", "source", [["", "全部"], ["official", "官方"], ["manual", "手动"], ["community", "社区"]]),
+      tipFilterSelect("范围", "scope", [["", "全部"], ["global", "全局"], ["project", "项目"]]),
+    );
+    const importButton = element("button", "tip-import-open", "手动导入");
+    importButton.type = "button";
+    importButton.addEventListener("click", openTipImport);
+    const refreshTipsButton = element("button", "tip-refresh", "核验官方来源");
+    refreshTipsButton.type = "button";
+    refreshTipsButton.addEventListener("click", async () => {
+      refreshTipsButton.disabled = true;
+      refreshTipsButton.textContent = "核验中…";
+      try {
+        await fetchJson("/api/ai-tips/refresh", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: '{"force":true}',
+        });
+      } catch { /* failure state is persisted per source and shown after reload */ }
+      await loadTips();
+    });
+    controls.append(importButton, refreshTipsButton);
+    root.append(controls);
+    const overview = element("div", "tips-overview");
+    overview.append(
+      metric("待审核", summary.counts.candidate || 0, "不会自动生效"),
+      metric("已批准", summary.counts.approved || 0, "已进入受管规则"),
+      metric("全局应用", summary.applied.global || 0, "影响之后的新任务"),
+      metric("项目应用", summary.applied.project || 0, "只影响当前仓库"),
+    );
+    root.append(overview);
+    root.append(element(
+      "p",
+      summary.sources.failed ? "tip-source-state unhealthy" : "tip-source-state",
+      `官方技巧来源：${summary.sources.healthy}/${summary.sources.total} 新鲜${summary.sources.failed ? ` · ${summary.sources.failed} 个需要复核` : ""}`,
+    ));
+    const grid = element("div", "tip-grid");
+    if (payload.tips.length) grid.append(...payload.tips.map(tipCard));
+    else grid.append(element("div", "radar-empty", "没有符合条件的技巧。"));
+    root.append(grid);
+    if (applications.applications.length) {
+      const audit = element("section", "tip-audit");
+      audit.append(element("h3", "", "最近规则应用"));
+      applications.applications.forEach((item) => {
+        const row = element("div", "tip-audit-row");
+        row.append(
+          element("span", "", `${item.scope === "global" ? "全局" : "项目"} · ${item.title}`),
+          element("small", "", `${item.status} · ${formatTime(item.applied_at)}`),
+        );
+        if (item.status === "applied") {
+          const button = element("button", "tip-rollback", "回滚");
+          button.type = "button";
+          button.addEventListener("click", () => rollbackTip(item.id).catch(() => {}));
+          row.append(button);
+        }
+        audit.append(row);
+      });
+      root.append(audit);
+    }
+    catalogCaption.textContent = `共 ${payload.count} 条；全部需要人工审核`;
+    resultsRoot.replaceChildren(root);
+  } catch {
+    resultsRoot.replaceChildren(element("div", "radar-empty", "暂时无法读取 AI 效率技巧。"));
+  }
+}
+
 function loadCurrentView() {
   tabs.forEach((tab) => {
     tab.classList.toggle("active", tab.dataset.view === currentView);
   });
   const changes = currentView === "changes";
   const poster = currentView === "poster";
+  const tips = currentView === "tips";
   const priceView = ["token-prices", "gpu-prices"].includes(currentView);
   updateHero();
   featuredSection.hidden = currentView !== "recommended";
-  summaryRoot.hidden = priceView || changes || poster;
+  summaryRoot.hidden = priceView || changes || poster || tips;
   pricingControls.hidden = !priceView;
-  browserGrid.classList.toggle("pricing-mode", priceView || poster);
-  radarSidebar.hidden = priceView || poster;
-  filters.hidden = changes || priceView || poster || filterToggle.getAttribute("aria-expanded") !== "true";
-  filterToggle.hidden = changes || priceView || poster;
+  browserGrid.classList.toggle("pricing-mode", priceView || poster || tips);
+  radarSidebar.hidden = priceView || poster || tips;
+  filters.hidden = changes || priceView || poster || tips || filterToggle.getAttribute("aria-expanded") !== "true";
+  filterToggle.hidden = changes || priceView || poster || tips;
   queryInput.disabled = changes || poster;
   catalogTitle.textContent = currentView === "token-prices"
     ? "Token 费用榜单"
     : currentView === "gpu-prices"
       ? "GPU 算力费用榜单"
+      : tips
+        ? "AI 效率技巧"
       : poster
         ? "日报海报"
       : changes
@@ -1209,7 +1459,8 @@ function loadCurrentView() {
           ? "按用途浏览"
           : `${kindLabel(currentView)}资源`;
   if (priceView) configurePricingControls();
-  if (poster) loadPoster();
+  if (tips) loadTips();
+  else if (poster) loadPoster();
   else if (changes) loadChanges();
   else if (currentView === "token-prices") loadTokenPrices();
   else if (currentView === "gpu-prices") loadGpuPrices();

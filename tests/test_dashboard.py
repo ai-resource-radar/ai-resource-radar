@@ -86,6 +86,37 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(json.loads(body)["count"], 0)
         self.assertTrue(offers.call_args.kwargs["free_image_generation"])
 
+    def test_tips_api_seeds_imports_and_rejects_candidate(self) -> None:
+        status, _, body = self.request("GET", "/api/ai-tips/summary")
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body)["counts"]["candidate"], 1)
+
+        payload = {
+            "title": "核验技巧",
+            "category": "verification",
+            "summary": "先核对来源。",
+            "instruction": "批准前检查官方资料。",
+            "source_url": "https://example.com/tip",
+        }
+        status, _, body = self.request(
+            "POST",
+            "/api/ai-tips/import",
+            body=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertEqual(status, 201)
+        tip = json.loads(body)
+        self.assertEqual(tip["status"], "candidate")
+
+        status, _, body = self.request(
+            "POST",
+            f"/api/ai-tips/{tip['tip_id']}/review",
+            body=b'{"action":"reject"}',
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body)["status"], "rejected")
+
     def test_rejects_untrusted_host_and_concurrent_tasks(self) -> None:
         status, _, body = self.request(
             "GET",
@@ -118,7 +149,7 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(status, 503)
         self.assertEqual(payload["error"], "ai_radar_schema_unsupported")
         self.assertEqual(payload["database_schema_version"], 99)
-        self.assertEqual(payload["runtime_supported_schema_version"], 5)
+        self.assertEqual(payload["runtime_supported_schema_version"], 6)
 
         status, _, body = self.request(
             "POST",

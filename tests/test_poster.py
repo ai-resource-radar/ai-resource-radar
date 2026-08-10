@@ -340,7 +340,7 @@ class PosterTests(unittest.TestCase):
         self.assertEqual(exit_code, 2)
         self.assertEqual(payload["error"], "ai_radar_schema_unsupported")
         self.assertEqual(payload["database_schema_version"], 99)
-        self.assertEqual(payload["runtime_supported_schema_version"], 5)
+        self.assertEqual(payload["runtime_supported_schema_version"], 6)
 
     def test_cli_forwards_free_image_generation_filter(self) -> None:
         output = StringIO()
@@ -902,7 +902,7 @@ class PosterTests(unittest.TestCase):
             finally:
                 migrated.close()
 
-        self.assertEqual(version, 5)
+            self.assertEqual(version, 6)
         self.assertEqual(notification_count, 1)
         self.assertEqual(daily_table, 1)
 

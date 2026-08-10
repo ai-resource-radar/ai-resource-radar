@@ -1228,6 +1228,59 @@ button { color: inherit; }
 .provider-dialog-item small { display: block; }
 .provider-dialog-item small { margin-top: 3px; color: var(--muted); }
 
+.tips-workspace { display: grid; gap: 24px; }
+.tip-filter-bar { display: flex; flex-wrap: wrap; gap: 10px; }
+.tip-filter { display: grid; gap: 4px; color: var(--muted); font-size: 10px; }
+.tip-filter select { min-width: 120px; border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; background: white; color: var(--ink); }
+.tip-import-open { align-self: end; border: 1px solid var(--green); border-radius: 9px; padding: 9px 13px; background: var(--green); color: white; cursor: pointer; }
+.tip-refresh { align-self: end; border: 1px solid var(--line); border-radius: 9px; padding: 9px 13px; background: white; cursor: pointer; }
+.tip-import-form { display: grid; gap: 13px; margin-top: 20px; }
+.tip-import-field { display: grid; gap: 6px; color: var(--muted); font-size: 11px; }
+.tip-import-field input, .tip-import-field textarea, .tip-import-field select { width: 100%; border: 1px solid var(--line); border-radius: 9px; padding: 10px; background: white; color: var(--ink); }
+.tip-import-field textarea { min-height: 84px; resize: vertical; }
+.tips-overview {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: white;
+}
+.tip-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; }
+.tip-card {
+  display: grid;
+  gap: 10px;
+  min-height: 210px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: white;
+  cursor: pointer;
+}
+.tip-card:hover, .tip-card:focus { border-color: var(--green); outline: none; transform: translateY(-1px); }
+.tip-card h3 { margin: 0; font-size: 18px; line-height: 1.35; }
+.tip-card p { margin: 0; color: var(--muted); line-height: 1.65; }
+.tip-card small { margin-top: auto; color: var(--muted); }
+.tip-status { color: var(--amber); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.tip-status.approved { color: var(--green); }
+.tip-status.rejected, .tip-status.retired { color: var(--muted); }
+.tip-review-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 20px; }
+.tip-review-actions button, .tip-rollback {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 12px;
+  background: white;
+  cursor: pointer;
+}
+.tip-review-actions .tip-approve { border-color: var(--green); color: var(--green); font-weight: 700; }
+.tip-review-actions .tip-reject { color: #a04435; }
+.tip-audit { display: grid; gap: 8px; padding: 20px; border: 1px solid var(--line); border-radius: 15px; background: white; }
+.tip-audit h3 { margin: 0 0 8px; }
+.tip-audit-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.tip-audit-row small { color: var(--muted); }
+.tip-error { color: #a04435; }
+.tip-source-state { margin: -10px 0 0; color: var(--muted); font-size: 12px; }
+.tip-source-state.unhealthy { color: #a04435; }
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -1293,4 +1346,6 @@ button { color: inherit; }
   .poster-stage-heading { align-items: flex-start; flex-direction: column; }
   .poster-generate { width: 100%; }
   .poster-actions { align-items: flex-start; flex-direction: column; }
+  .tips-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tip-audit-row { grid-template-columns: 1fr; }
 }

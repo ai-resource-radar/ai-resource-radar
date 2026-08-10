@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-resource-radar"
-version = "0.2.0"
-description = "Deterministic radar for free AI tokens, GPU compute, grants, prices, and AI-generated daily posters"
+version = "0.3.0"
+description = "Daily-verified free AI tokens, GPU compute, grants, and prices with a local-first dashboard"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{name = "ai-resource-radar"}]
-keywords = ["ai", "gpu", "tokens", "pricing", "free-tier", "macos"]
+keywords = ["ai", "gpu", "tokens", "pricing", "free-tier", "price-tracker", "local-first"]
 dependencies = ["Pillow>=10,<13"]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -22,11 +22,13 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/ai-resource-radar/ai-resource-radar"
+Homepage = "https://ai-resource-radar.github.io/ai-resource-radar/"
+Repository = "https://github.com/ai-resource-radar/ai-resource-radar"
 Issues = "https://github.com/ai-resource-radar/ai-resource-radar/issues"
 
 [project.scripts]
 ai-radar = "ai_resource_radar.cli:main"
+ai-resource-radar = "ai_resource_radar.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -38,4 +40,11 @@ ai_resource_radar = [
   "web/*.css",
   "web/*.js",
   "web/*.svg",
+  "public_web/*.html",
+  "public_web/*.css",
+  "public_web/*.js",
+  "public_web/*.txt",
+  "public_web/*.xml",
+  "public_web/*.svg",
+  "public_web/*.png",
 ]

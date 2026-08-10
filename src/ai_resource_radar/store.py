@@ -18,7 +18,7 @@ from ai_resource_radar.sources import (
 )
 
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 FETCH_RUN_RETENTION_DAYS = 90
 CHANGE_RETENTION_DAYS = 365
 NOTIFICATION_RETENTION_DAYS = 365
@@ -57,6 +57,9 @@ class StorageMaintenanceResult:
     pruned_changes: int = 0
     pruned_notifications: int = 0
     pruned_offers: int = 0
+    pruned_tip_evidence: int = 0
+    pruned_tip_changes: int = 0
+    pruned_tips: int = 0
     vacuum_status: str = "not_needed"
     database_bytes: int = 0
     error_code: str | None = None
@@ -68,6 +71,9 @@ class StorageMaintenanceResult:
             "pruned_changes": self.pruned_changes,
             "pruned_notifications": self.pruned_notifications,
             "pruned_offers": self.pruned_offers,
+            "pruned_tip_evidence": self.pruned_tip_evidence,
+            "pruned_tip_changes": self.pruned_tip_changes,
+            "pruned_tips": self.pruned_tips,
             "vacuum_status": self.vacuum_status,
             "database_bytes": self.database_bytes,
             "error_code": self.error_code,
@@ -346,6 +352,78 @@ def _initialize(connection: sqlite3.Connection) -> bool:
         );
         CREATE INDEX IF NOT EXISTS daily_reports_status_date
             ON daily_reports(status, report_date DESC);
+        CREATE TABLE IF NOT EXISTS tips (
+            tip_id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            category TEXT NOT NULL,
+            summary TEXT NOT NULL,
+            instruction TEXT NOT NULL,
+            example TEXT NOT NULL DEFAULT '',
+            constraints_json TEXT NOT NULL DEFAULT '[]',
+            tags_json TEXT NOT NULL DEFAULT '[]',
+            status TEXT NOT NULL DEFAULT 'candidate'
+                CHECK(status IN ('candidate', 'approved', 'rejected', 'retired')),
+            risk_level TEXT NOT NULL DEFAULT 'medium'
+                CHECK(risk_level IN ('low', 'medium', 'high')),
+            source_type TEXT NOT NULL DEFAULT 'manual'
+                CHECK(source_type IN ('official', 'manual', 'community')),
+            source_url TEXT NOT NULL,
+            source_title TEXT NOT NULL DEFAULT '',
+            evidence_summary TEXT NOT NULL DEFAULT '',
+            content_hash TEXT NOT NULL,
+            discovered_at TEXT NOT NULL,
+            verified_at TEXT,
+            reviewed_at TEXT,
+            approved_at TEXT,
+            applied_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS tips_browse
+            ON tips(status, category, risk_level, updated_at DESC);
+        CREATE TABLE IF NOT EXISTS tip_evidence (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tip_id TEXT NOT NULL REFERENCES tips(tip_id) ON DELETE CASCADE,
+            source_url TEXT NOT NULL,
+            source_type TEXT NOT NULL,
+            fetched_at TEXT NOT NULL,
+            etag TEXT,
+            last_modified TEXT,
+            content_hash TEXT NOT NULL,
+            evidence_summary TEXT NOT NULL,
+            parse_status TEXT NOT NULL DEFAULT 'success',
+            error_code TEXT
+        );
+        CREATE INDEX IF NOT EXISTS tip_evidence_tip
+            ON tip_evidence(tip_id, fetched_at DESC);
+        CREATE TABLE IF NOT EXISTS tip_changes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tip_id TEXT NOT NULL REFERENCES tips(tip_id) ON DELETE CASCADE,
+            changed_at TEXT NOT NULL,
+            change_type TEXT NOT NULL,
+            before_json TEXT,
+            after_json TEXT,
+            importance TEXT NOT NULL DEFAULT 'normal'
+        );
+        CREATE INDEX IF NOT EXISTS tip_changes_time
+            ON tip_changes(changed_at DESC, id DESC);
+        CREATE TABLE IF NOT EXISTS tip_applications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tip_id TEXT NOT NULL REFERENCES tips(tip_id) ON DELETE CASCADE,
+            scope TEXT NOT NULL CHECK(scope IN ('global', 'project')),
+            target_path TEXT NOT NULL,
+            tip_version_hash TEXT NOT NULL,
+            old_file_hash TEXT,
+            new_file_hash TEXT,
+            backup_path TEXT,
+            status TEXT NOT NULL DEFAULT 'applied'
+                CHECK(status IN ('applied', 'failed', 'rolled_back')),
+            error_code TEXT,
+            applied_at TEXT NOT NULL,
+            rolled_back_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS tip_applications_tip
+            ON tip_applications(tip_id, applied_at DESC);
         """
     )
     offer_columns = _columns(connection, "offers")
@@ -589,6 +667,36 @@ def maintain_storage(
                 """,
                 (history_cutoff,),
             )
+            tip_evidence_cursor = connection.execute(
+                """
+                DELETE FROM tip_evidence
+                WHERE julianday(fetched_at) < julianday(?)
+                  AND tip_id IN (
+                    SELECT tip_id FROM tips WHERE status != 'approved'
+                  )
+                """,
+                (history_cutoff,),
+            )
+            tip_change_cursor = connection.execute(
+                """
+                DELETE FROM tip_changes
+                WHERE julianday(changed_at) < julianday(?)
+                  AND importance != 'high'
+                """,
+                (history_cutoff,),
+            )
+            tip_cursor = connection.execute(
+                """
+                DELETE FROM tips
+                WHERE status IN ('candidate', 'rejected', 'retired')
+                  AND julianday(updated_at) < julianday(?)
+                  AND NOT EXISTS (
+                    SELECT 1 FROM tip_changes c
+                    WHERE c.tip_id = tips.tip_id AND c.importance = 'high'
+                  )
+                """,
+                (history_cutoff,),
+            )
             _metadata_set(
                 connection,
                 "last_maintenance_at",
@@ -598,6 +706,9 @@ def maintain_storage(
         pruned_changes = max(0, change_cursor.rowcount)
         pruned_notifications = max(0, notification_cursor.rowcount)
         pruned_offers = max(0, offer_cursor.rowcount)
+        pruned_tip_evidence = max(0, tip_evidence_cursor.rowcount)
+        pruned_tip_changes = max(0, tip_change_cursor.rowcount)
+        pruned_tips = max(0, tip_cursor.rowcount)
     except sqlite3.Error:
         return StorageMaintenanceResult(
             status="failed",
@@ -610,6 +721,9 @@ def maintain_storage(
         + pruned_changes
         + pruned_notifications
         + pruned_offers
+        + pruned_tip_evidence
+        + pruned_tip_changes
+        + pruned_tips
     )
     page_size = int(connection.execute("PRAGMA page_size").fetchone()[0])
     page_count = int(connection.execute("PRAGMA page_count").fetchone()[0])
@@ -637,6 +751,9 @@ def maintain_storage(
         pruned_changes=pruned_changes,
         pruned_notifications=pruned_notifications,
         pruned_offers=pruned_offers,
+        pruned_tip_evidence=pruned_tip_evidence,
+        pruned_tip_changes=pruned_tip_changes,
+        pruned_tips=pruned_tips,
         vacuum_status=vacuum_status,
         database_bytes=_database_bytes(connection),
         error_code=("storage_vacuum_deferred" if vacuum_status == "deferred" else None),
@@ -652,6 +769,8 @@ def storage_summary(connection: sqlite3.Connection) -> dict[str, Any]:
             "delivered_notifications_days": NOTIFICATION_RETENTION_DAYS,
             "daily_posters_days": POSTER_RETENTION_DAYS,
             "important_free_changes": "forever",
+            "tip_candidates_days": CHANGE_RETENTION_DAYS,
+            "approved_tips": "until_retired",
         },
         "posters": {
             "count": int(
@@ -663,6 +782,14 @@ def storage_summary(connection: sqlite3.Connection) -> dict[str, Any]:
                 connection.execute(
                     "SELECT COALESCE(SUM(image_bytes), 0) FROM daily_reports "
                     "WHERE status = 'success'"
+                ).fetchone()[0]
+            ),
+        },
+        "tips": {
+            "count": int(connection.execute("SELECT COUNT(*) FROM tips").fetchone()[0]),
+            "approved": int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM tips WHERE status = 'approved'"
                 ).fetchone()[0]
             ),
         },

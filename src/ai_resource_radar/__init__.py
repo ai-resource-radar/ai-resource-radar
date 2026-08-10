@@ -1,6 +1,6 @@
 """Stable public facade for the deterministic AI Resource Radar core."""
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 from ai_resource_radar.doctor import DoctorCheck, DoctorReport, diagnose, run_doctor
 from ai_resource_radar.locks import (
@@ -45,6 +45,20 @@ from ai_resource_radar.store import (
     list_offers,
     radar_summary,
     source_freshness_status,
+)
+from ai_resource_radar.tips import (
+    OFFICIAL_TIP_SOURCES,
+    TIP_CATEGORIES,
+    add_tip,
+    get_tip,
+    list_tip_applications,
+    list_tips,
+    prune_tips,
+    refresh_official_tips,
+    review_tip,
+    rollback_tip_application,
+    seed_initial_tips,
+    tips_summary,
 )
 
 # Concise host-facing alias; the original name remains public and compatible.
@@ -92,4 +106,16 @@ __all__ = [
     "summary",
     "test_poster_model",
     "resolve_daily_poster",
+    "OFFICIAL_TIP_SOURCES",
+    "TIP_CATEGORIES",
+    "add_tip",
+    "get_tip",
+    "list_tip_applications",
+    "list_tips",
+    "prune_tips",
+    "refresh_official_tips",
+    "review_tip",
+    "rollback_tip_application",
+    "seed_initial_tips",
+    "tips_summary",
 ]

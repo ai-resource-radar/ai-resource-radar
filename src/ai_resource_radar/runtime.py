@@ -32,7 +32,7 @@ from ai_resource_radar.store import (
 
 
 MAX_SOURCE_BYTES = 16 * 1024 * 1024
-USER_AGENT = "AIResourceRadar/0.2"
+USER_AGENT = "AIResourceRadar/0.3"
 
 
 @dataclass(frozen=True)
@@ -102,6 +102,9 @@ class RefreshReport:
                 "pruned_changes": 0,
                 "pruned_notifications": 0,
                 "pruned_offers": 0,
+                "pruned_tip_evidence": 0,
+                "pruned_tip_changes": 0,
+                "pruned_tips": 0,
                 "vacuum_status": "not_needed",
                 "database_bytes": 0,
                 "error_code": None,

@@ -1,0 +1,52 @@
+name: Source request
+description: Suggest an official public source for the radar.
+title: "[source] "
+labels:
+  - source-request
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please suggest one official, public, allow-listable source. Community lists are welcome as leads but are not proof of an offer.
+  - type: input
+    id: provider
+    attributes:
+      label: Provider or source name
+      placeholder: Example Provider
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Official URL
+      description: Use the page or API that states the quota, price, eligibility, or expiry.
+      placeholder: https://example.com/docs/free-tier
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Resource kind
+      options:
+        - token
+        - gpu
+        - grant
+        - price
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: What should be tracked?
+      description: Quote or describe the relevant public policy, including reset period and region/card requirements.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: This is an official HTTPS source, not a private dashboard or account-only page.
+          required: true
+        - label: I checked that this request is not already covered by an open issue.
+          required: true

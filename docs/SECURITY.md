@@ -9,5 +9,7 @@
 - OCR runs locally with macOS Vision. OCR text is stored only as bounded validation metadata.
 - OpenClaw remains responsible for credentials configured in OpenClaw. The radar stores only the non-sensitive provider/model selection and capability result.
 - Every formal poster model must be explicitly eligible. Test-only models are rejected before a paid or quota-consuming request is made by the daily workflow.
+- Imported tip text is untrusted data, never executable instructions. Only validated structured fields can enter the generated AGENTS.md template.
+- Tip approval can target only the exact global or current-project AGENTS.md. Writes are locked, backed up, atomic, hash-audited, and rollback refuses a target changed since application.
 
 Report vulnerabilities privately to the repository owner before opening a public issue containing sensitive details.

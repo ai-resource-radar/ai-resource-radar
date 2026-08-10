@@ -1,0 +1,43 @@
+name: Parser drift
+description: Report a source whose public shape or policy changed.
+title: "[parser drift] "
+labels:
+  - parser-drift
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The radar keeps the last trusted value when a parser cannot verify a page. Please include enough public evidence to reproduce the drift.
+  - type: input
+    id: source
+    attributes:
+      label: Source ID or provider
+      placeholder: groq-free-limits
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Public source URL
+      placeholder: https://example.com/docs/free-tier
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed change
+      description: Explain the old and new labels, quota, price, or page structure. Do not paste private account data.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Minimal public evidence
+      description: Add a short excerpt or a link to a public diff/screenshot. Redact tokens and personal information.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Radar version
+      placeholder: 0.3.0

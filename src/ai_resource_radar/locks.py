@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Iterator, TextIO
 
 
-VALID_OPERATIONS = frozenset({"refresh", "poster"})
+VALID_OPERATIONS = frozenset({"refresh", "poster", "tips"})
 
 
 class OperationLockedError(RuntimeError):

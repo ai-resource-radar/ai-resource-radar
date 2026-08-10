@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+    <title>AI Resource Radar — AI 资源雷达</title>
+    <meta name="description" content="A read-only, bilingual radar for verified free AI tokens, GPU credits, grants, pricing and changes. 双语、只读、官方核验的 AI 免费 Token、GPU、资助与价格变化。">
+    <meta name="robots" content="index,follow">
+    <link rel="canonical" href="https://ai-resource-radar.github.io/ai-resource-radar/">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="AI Resource Radar — AI 资源雷达">
+    <meta property="og:description" content="Find what is free, how to claim it, limits, evidence and update time. 找到免费内容、领取方式、限制、证据和更新时间。">
+    <meta property="og:url" content="https://ai-resource-radar.github.io/ai-resource-radar/">
+    <meta property="og:site_name" content="AI Resource Radar">
+    <meta property="og:image" content="https://ai-resource-radar.github.io/ai-resource-radar/social-preview.png">
+    <meta property="og:image:width" content="1280">
+    <meta property="og:image:height" content="640">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="AI Resource Radar — AI 资源雷达">
+    <meta name="twitter:description" content="Daily-verified free AI tokens, GPU compute and price changes.">
+    <meta name="twitter:image" content="https://ai-resource-radar.github.io/ai-resource-radar/social-preview.png">
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="./styles.css">
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "AI Resource Radar — AI 资源雷达",
+        "url": "https://ai-resource-radar.github.io/ai-resource-radar/",
+        "description": "A bilingual, read-only catalogue of verified AI free tiers, GPU credits, grants and prices."
+      }
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main" data-i18n="skip">跳到内容 / Skip to content</a>
+    <header class="site-header">
+      <div class="shell header-inner">
+        <a class="brand" href="./" aria-label="AI Resource Radar">
+          <span class="brand-mark" aria-hidden="true">AR</span>
+          <span class="brand-copy">
+            <strong>AI Resource Radar</strong>
+            <small>AI 资源雷达 · v0.3</small>
+          </span>
+        </a>
+        <div class="header-actions">
+          <span id="health-pill" class="health-pill" role="status">
+            <span class="health-dot" aria-hidden="true"></span>
+            <span id="health-label" data-i18n="health.loading">读取来源 / Loading sources</span>
+          </span>
+          <button id="language-toggle" class="language-toggle" type="button" aria-label="切换语言 / Toggle language">
+            <span aria-hidden="true">中 / EN</span>
+          </button>
+        </div>
+      </div>
+      <div class="shell nav-wrap">
+        <nav id="main-nav" class="tabs" aria-label="资源分类 / Resource categories">
+          <button class="tab is-active" type="button" data-tab="recommended" aria-selected="true"><span data-i18n="tabs.recommended">推荐 / Recommended</span></button>
+          <button class="tab" type="button" data-tab="token" aria-selected="false"><span data-i18n="tabs.token">免费 Token / Free tokens</span></button>
+          <button class="tab" type="button" data-tab="gpu" aria-selected="false"><span data-i18n="tabs.gpu">免费 GPU / Free GPU</span></button>
+          <button class="tab" type="button" data-tab="grant" aria-selected="false"><span data-i18n="tabs.grant">资助 / Grants</span></button>
+          <button class="tab" type="button" data-tab="token-prices" aria-selected="false"><span data-i18n="tabs.tokenPrices">Token 价格 / Token prices</span></button>
+          <button class="tab" type="button" data-tab="gpu-prices" aria-selected="false"><span data-i18n="tabs.gpuPrices">GPU 价格 / GPU prices</span></button>
+          <button class="tab" type="button" data-tab="changes" aria-selected="false"><span data-i18n="tabs.changes">变化 / Changes</span></button>
+          <button class="tab" type="button" data-tab="about" aria-selected="false"><span data-i18n="tabs.about">来源健康 / About</span></button>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main" class="shell main-content">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow" data-i18n="hero.eyebrow">READ-ONLY · OFFICIAL EVIDENCE</p>
+          <h1 id="hero-title" data-i18n="hero.title">先看清楚，再开始用。</h1>
+          <p id="hero-description" data-i18n="hero.description">把“送什么、怎么领、有什么限制、证据在哪里”放在同一张卡片里。数据由本地 JSON 提供，页面不会提交表单或代你操作账号。</p>
+        </div>
+        <div class="hero-note">
+          <span class="hero-note-label" data-i18n="hero.updated">数据更新时间 / Data updated</span>
+          <strong id="last-updated">—</strong>
+          <small id="manifest-version">manifest —</small>
+        </div>
+      </section>
+
+      <section id="summary" class="summary-grid" aria-label="目录摘要 / Catalogue summary"></section>
+
+      <section class="catalog-shell" aria-labelledby="catalog-heading">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker" data-i18n="catalog.kicker">CATALOGUE</p>
+            <h2 id="catalog-heading" data-i18n="catalog.title">浏览资源</h2>
+            <p id="catalog-caption" class="section-caption" data-i18n="catalog.caption">搜索供应商，按核验、信用卡和地区状态筛选。</p>
+          </div>
+          <div class="download-actions" aria-label="下载 / Downloads">
+            <button id="download-json" class="button button-quiet" type="button" data-i18n="download.json">下载 JSON / JSON</button>
+            <button id="download-csv" class="button button-quiet" type="button" data-i18n="download.csv">下载 CSV / CSV</button>
+          </div>
+        </div>
+
+        <div class="filters" aria-label="筛选与排序 / Filters and sorting">
+          <label class="search-field">
+            <span data-i18n="filters.search">搜索 / Search</span>
+            <input id="search-input" type="search" maxlength="120" autocomplete="off" data-i18n-placeholder="filters.searchPlaceholder" placeholder="供应商、模型或关键词 / provider, model, keyword">
+          </label>
+          <label>
+            <span data-i18n="filters.provider">供应商 / Provider</span>
+            <select id="provider-filter"><option value="" data-i18n="filters.allProviders">全部 / All</option></select>
+          </label>
+          <label>
+            <span data-i18n="filters.verification">核验 / Verification</span>
+            <select id="verification-filter">
+              <option value="all" data-i18n="filters.all">全部 / All</option>
+              <option value="official" data-i18n="filters.official">仅官方 / Official only</option>
+              <option value="community" data-i18n="filters.community">社区或待核验 / Community</option>
+            </select>
+          </label>
+          <label>
+            <span data-i18n="filters.card">信用卡 / Card</span>
+            <select id="card-filter">
+              <option value="all" data-i18n="filters.all">全部 / All</option>
+              <option value="no" data-i18n="filters.noCard">无需信用卡 / No card</option>
+              <option value="yes" data-i18n="filters.cardRequired">需要或待确认 / Required or unknown</option>
+            </select>
+          </label>
+          <label>
+            <span data-i18n="filters.mainland">大陆状态 / Mainland</span>
+            <select id="mainland-filter">
+              <option value="all" data-i18n="filters.all">全部 / All</option>
+              <option value="supported" data-i18n="filters.supported">可用 / Supported</option>
+              <option value="unknown" data-i18n="filters.unknown">待确认 / Unknown</option>
+              <option value="unsupported" data-i18n="filters.unsupported">不支持 / Unsupported</option>
+            </select>
+          </label>
+          <label>
+            <span data-i18n="filters.sort">排序 / Sort</span>
+            <select id="sort-filter">
+              <option value="recommended" data-i18n="sort.recommended">推荐度 / Recommended</option>
+              <option value="updated" data-i18n="sort.updated">更新时间 / Updated</option>
+              <option value="price" data-i18n="sort.price">价格从低 / Lowest price</option>
+              <option value="provider" data-i18n="sort.provider">供应商 / Provider</option>
+            </select>
+          </label>
+          <button id="clear-filters" class="button button-link" type="button" data-i18n="filters.clear">清除筛选 / Clear</button>
+        </div>
+
+        <p id="load-status" class="load-status" role="status" aria-live="polite" data-i18n="status.loading">正在读取本地数据 / Loading local data…</p>
+        <div id="content" class="content-grid" aria-live="polite"></div>
+        <button id="load-more" class="button button-quiet load-more" type="button" hidden>加载更多 / Load more</button>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="shell footer-inner">
+        <p><strong>AI Resource Radar</strong> · <span data-i18n="footer.readOnly">只读目录，不会代你注册、提交或生成海报 / Read-only catalogue.</span></p>
+        <p><a href="https://github.com/ai-resource-radar/ai-resource-radar" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" data-i18n="footer.github">GitHub 源码 / Source</a></p>
+      </div>
+    </footer>
+    <noscript>需要启用 JavaScript 才能读取静态数据。 JavaScript is required to read the static catalogue.</noscript>
+    <script src="./app.js" defer></script>
+  </body>
+</html>

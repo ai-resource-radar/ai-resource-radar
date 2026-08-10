@@ -86,14 +86,16 @@ def _overall(checks: list[DoctorCheck]) -> str:
 
 def _package_version() -> str:
     try:
+        from ai_resource_radar import __version__
+
+        if __version__:
+            return str(__version__)
+    except (ImportError, AttributeError):
+        pass
+    try:
         return metadata.version("ai-resource-radar")
     except metadata.PackageNotFoundError:
-        try:
-            from ai_resource_radar import __version__
-
-            return __version__
-        except (ImportError, AttributeError):
-            return "unknown"
+        return "unknown"
 
 
 def _poster_configuration(connection: sqlite3.Connection) -> tuple[bool, str, str]:

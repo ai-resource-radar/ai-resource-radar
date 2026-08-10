@@ -31,7 +31,7 @@ class RadarServer(ThreadingHTTPServer):
 
 
 class RadarHandler(BaseHTTPRequestHandler):
-    server_version = "AIResourceRadar/0.2"
+    server_version = "AIResourceRadar/0.3"
     sys_version = ""
     server: RadarServer
 
@@ -124,6 +124,44 @@ class RadarHandler(BaseHTTPRequestHandler):
                 return
         if path == "/api/ai-resources/summary":
             self._json(200, self.server.radar.summary())
+            return
+        if path == "/api/ai-tips/summary":
+            self._json(200, self.server.radar.tips_summary())
+            return
+        if path == "/api/ai-tips":
+            try:
+                tips = self.server.radar.tips(
+                    status=query.get("status", [""])[0] or None,
+                    category=query.get("category", [""])[0] or None,
+                    risk=query.get("risk", [""])[0] or None,
+                    source=query.get("source", [""])[0] or None,
+                    scope=query.get("scope", [""])[0] or None,
+                    query=query.get("q", [""])[0] or None,
+                    limit=int(query.get("limit", ["100"])[0]),
+                    offset=int(query.get("offset", ["0"])[0]),
+                )
+            except (TypeError, ValueError):
+                self._json(400, {"error": "invalid_ai_tip_filter"})
+                return
+            self._json(200, {"schema_version": "1.0", "count": len(tips), "tips": tips})
+            return
+        if path == "/api/ai-tips/applications":
+            try:
+                applications = self.server.radar.tip_applications(
+                    limit=int(query.get("limit", ["100"])[0])
+                )
+            except (TypeError, ValueError):
+                self._json(400, {"error": "invalid_ai_tip_application_filter"})
+                return
+            self._json(200, {"schema_version": "1.0", "applications": applications})
+            return
+        tip_parts = path.strip("/").split("/")
+        if len(tip_parts) == 3 and tip_parts[:2] == ["api", "ai-tips"]:
+            tip = self.server.radar.tip(tip_parts[2])
+            if tip is None:
+                self._json(404, {"error": "tip_not_found"})
+            else:
+                self._json(200, tip)
             return
         if path == "/api/ai-resources":
             mainland_value = query.get("mainland", [""])[0]
@@ -286,8 +324,14 @@ class RadarHandler(BaseHTTPRequestHandler):
                 self._json(503, schema_error)
                 return
         if (
-            path not in {"/api/ai-resources/refresh", "/api/ai-daily/generate"}
+            path not in {
+                "/api/ai-resources/refresh",
+                "/api/ai-daily/generate",
+                "/api/ai-tips/import",
+                "/api/ai-tips/refresh",
+            }
             and not path.startswith("/api/ai-resources/notifications/")
+            and not path.startswith("/api/ai-tips/")
         ):
             self._json(404, {"error": "not_found"})
             return
@@ -295,7 +339,8 @@ class RadarHandler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError:
             length = -1
-        if not 0 <= length <= 4096:
+        max_length = 16384 if path.startswith("/api/ai-tips") else 4096
+        if not 0 <= length <= max_length:
             self._json(413, {"error": "request_too_large"})
             return
         try:
@@ -324,6 +369,57 @@ class RadarHandler(BaseHTTPRequestHandler):
                 self._json(409, {"error": "daily_poster_already_running"})
             else:
                 self._json(202, state)
+            return
+        if path == "/api/ai-tips/import":
+            if not isinstance(payload, dict):
+                self._json(400, {"error": "invalid_ai_tip_import"})
+                return
+            try:
+                tip = self.server.radar.import_tip(payload)
+            except (TypeError, ValueError):
+                self._json(400, {"error": "invalid_ai_tip_import"})
+                return
+            self._json(201, tip)
+            return
+        if path == "/api/ai-tips/refresh":
+            force = payload.get("force", False) if isinstance(payload, dict) else False
+            if not isinstance(force, bool):
+                self._json(400, {"error": "invalid_ai_tip_refresh"})
+                return
+            report = self.server.radar.refresh_tips(force=force)
+            self._json(200, report)
+            return
+        tip_parts = path.strip("/").split("/")
+        if (
+            len(tip_parts) == 4
+            and tip_parts[:2] == ["api", "ai-tips"]
+            and tip_parts[3] == "review"
+        ):
+            if not isinstance(payload, dict):
+                self._json(400, {"error": "invalid_ai_tip_review"})
+                return
+            try:
+                tip = self.server.radar.review_tip(tip_parts[2], payload)
+            except ValueError as exc:
+                if str(exc) == "tip_not_found":
+                    self._json(404, {"error": "tip_not_found"})
+                else:
+                    self._json(400, {"error": str(exc)})
+                return
+            self._json(200, tip)
+            return
+        if (
+            len(tip_parts) == 5
+            and tip_parts[:3] == ["api", "ai-tips", "applications"]
+            and tip_parts[4] == "rollback"
+        ):
+            try:
+                application = self.server.radar.rollback_tip(int(tip_parts[3]))
+            except (TypeError, ValueError) as exc:
+                code = str(exc) or "invalid_tip_application_id"
+                self._json(400 if "not_found" not in code else 404, {"error": code})
+                return
+            self._json(200, application)
             return
         parts = path.strip("/").split("/")
         if (
@@ -366,6 +462,7 @@ def create_server(
     server.radar = AiRadarDashboard(
         database or default_database_path(),
         poster_root=poster_root,
+        project_root=Path.cwd(),
     )
     return server
 

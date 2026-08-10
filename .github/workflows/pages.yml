@@ -1,0 +1,127 @@
+name: Publish public radar
+
+on:
+  schedule:
+    # Keep the public snapshot close to the start of the UTC day.
+    - cron: "20 0 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Ignore source cadence and fetch every allow-listed source"
+        required: false
+        default: false
+        type: boolean
+
+# The deploy action needs Pages write access and an OIDC token.  No user key or
+# repository variable is needed: collection and site rendering are keyless.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install package
+        run: python -m pip install -e .
+
+      - name: Prepare CI-only SQLite cache
+        run: mkdir -p .ci-cache
+
+      - name: Restore CI-only SQLite database
+        uses: actions/cache@v4
+        with:
+          path: .ci-cache/radar.sqlite3
+          key: pages-radar-sqlite-${{ runner.os }}-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            pages-radar-sqlite-${{ runner.os }}-${{ github.ref_name }}-
+            pages-radar-sqlite-${{ runner.os }}-
+
+      - name: Refresh public data (keyless)
+        id: refresh
+        env:
+          RADAR_DB: .ci-cache/radar.sqlite3
+          RADAR_FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force || false }}
+        run: |
+          set +e
+          refresh_args=(--database "$RADAR_DB")
+          if [[ "$RADAR_FORCE" == "true" ]]; then
+            refresh_args+=(--force)
+          fi
+          ai-radar refresh "${refresh_args[@]}" > refresh-report.json
+          refresh_code=$?
+          set -e
+          echo "exit_code=$refresh_code" >> "$GITHUB_OUTPUT"
+          # A source-level partial report is safe for the site builder to
+          # represent. Unsupported-schema and other hard failures stop here.
+          if (( refresh_code > 1 )); then
+            cat refresh-report.json
+            exit "$refresh_code"
+          fi
+          cat refresh-report.json
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Build public site
+        run: |
+          ai-radar site build \
+            --database .ci-cache/radar.sqlite3 \
+            --output _site \
+            --base-url https://ai-resource-radar.github.io/ai-resource-radar/
+
+      - name: Verify public site and publication gate
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("_site")
+          index = root / "index.html"
+          manifest = root / "data/manifest.json"
+          if not index.is_file() or index.stat().st_size == 0:
+              raise SystemExit("pages_gate_missing_index")
+          if not manifest.is_file() or manifest.stat().st_size == 0:
+              raise SystemExit("pages_gate_missing_manifest")
+          payload = json.loads(manifest.read_text(encoding="utf-8"))
+          status = payload.get("status")
+          if status not in {"healthy", "partial"}:
+              raise SystemExit(f"pages_gate_rejected_status:{status!r}")
+          if payload.get("publishable") is False:
+              raise SystemExit("pages_gate_not_publishable")
+          print(f"public site gate: {status}")
+          print(f"files: {payload.get('files', [])}")
+          print(f"source health: {payload.get('source_health', {})}")
+          PY
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy Pages artifact
+        id: deployment
+        uses: actions/deploy-pages@v4

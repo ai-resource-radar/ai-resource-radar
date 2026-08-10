@@ -1,0 +1,59 @@
+name: Bug report
+description: Report a reproducible problem in the CLI, dashboard, or public site.
+title: "[bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please remove API keys, cookies, account identifiers, databases, and generated posters before sharing logs.
+  - type: input
+    id: version
+    attributes:
+      label: Radar version
+      placeholder: 0.3.0
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - refresh and parsing
+        - rankings and prices
+        - dashboard
+        - public Pages site
+        - poster
+        - tips
+        - packaging or CI
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Run ...
+        2. Open ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and safe logs
+      description: Include the command output with secrets and personal data removed.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: macOS 15.5, Python 3.13, installed from PyPI

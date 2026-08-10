@@ -11,6 +11,7 @@ import unittest
 from unittest.mock import patch
 
 from ai_resource_radar import SCHEMA_VERSION, UnsupportedSchemaError, run_doctor
+from ai_resource_radar.doctor import _package_version
 from ai_resource_radar.locks import (
     OperationLockedError,
     operation_lock,
@@ -76,6 +77,12 @@ def _hold_operation_lock(database: str, ready: object) -> None:
 
 
 class CoreV02Tests(unittest.TestCase):
+    @patch("ai_resource_radar.doctor.metadata.version", return_value="0.2.0")
+    def test_doctor_prefers_runtime_source_version(self, installed_version) -> None:
+        with patch("ai_resource_radar.__version__", "0.3.0"):
+            self.assertEqual(_package_version(), "0.3.0")
+        installed_version.assert_not_called()
+
     def test_zhipu_official_fixture_is_free_image_generation(self) -> None:
         source = SOURCE_BY_ID["zhipu-cogview-3-flash"]
         payload = (FIXTURES / "zhipu_cogview_3_flash.html").read_bytes()

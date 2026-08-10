@@ -28,12 +28,24 @@ from ai_resource_radar.store import (
     list_offers,
     radar_summary,
 )
+from ai_resource_radar.tips import (
+    add_tip,
+    get_tip,
+    list_tip_applications,
+    list_tips,
+    refresh_official_tips,
+    review_tip,
+    rollback_tip_application,
+    seed_initial_tips,
+    tips_summary,
+)
 
 
 @dataclass
 class AiRadarDashboard:
     path: Path
     poster_root: Path | None = None
+    project_root: Path | None = None
     _lock: Lock = field(default_factory=Lock)
     _state: dict[str, Any] = field(
         default_factory=lambda: {
@@ -88,6 +100,54 @@ class AiRadarDashboard:
 
     def changes(self, *, days: int, limit: int) -> tuple[dict[str, Any], ...]:
         return list_changes(self.path, days=days, limit=limit)
+
+    def tips_summary(self) -> dict[str, Any]:
+        seed_initial_tips(self.path)
+        return tips_summary(self.path)
+
+    def tips(self, **filters: Any) -> tuple[dict[str, Any], ...]:
+        return list_tips(self.path, **filters)
+
+    def tip(self, tip_id: str) -> dict[str, Any] | None:
+        return get_tip(self.path, tip_id)
+
+    def import_tip(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return add_tip(
+            self.path,
+            title=payload.get("title", ""),
+            category=payload.get("category", ""),
+            summary=payload.get("summary", ""),
+            instruction=payload.get("instruction", ""),
+            source_url=payload.get("source_url", ""),
+            source_type=payload.get("source_type", "manual"),
+            source_title=payload.get("source_title", ""),
+            example=payload.get("example", ""),
+            constraints=payload.get("constraints", ()),
+            tags=payload.get("tags", ()),
+            evidence_summary=payload.get("evidence_summary", ""),
+            risk_level=payload.get("risk_level", "medium"),
+        )
+
+    def review_tip(self, tip_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        return review_tip(
+            self.path,
+            tip_id,
+            action=payload.get("action", ""),
+            scope=payload.get("scope"),
+            reason=payload.get("reason", ""),
+            project_root=self.project_root,
+        )
+
+    def tip_applications(self, *, limit: int = 100) -> tuple[dict[str, Any], ...]:
+        return list_tip_applications(self.path, limit=limit)
+
+    def rollback_tip(self, application_id: int) -> dict[str, Any]:
+        return rollback_tip_application(
+            self.path, application_id, project_root=self.project_root
+        )
+
+    def refresh_tips(self, *, force: bool = False) -> dict[str, Any]:
+        return refresh_official_tips(self.path, force=force)
 
     def token_prices(self, **filters: Any) -> dict[str, Any]:
         return list_token_prices(self.path, **filters)
