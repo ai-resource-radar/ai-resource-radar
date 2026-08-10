@@ -87,11 +87,13 @@ def daily_report_status(
     key_store: KeyStore | None = None,
     current: date | None = None,
     openclaw_binary: str | Path | None = None,
+    configuration_status: Any = None,
 ) -> dict[str, Any]:
     configuration = poster_configuration(
         path,
         key_store=key_store,
         openclaw_binary=openclaw_binary,
+        configuration_status=configuration_status,
     )
     today = (current or date.today()).isoformat()
     report = None

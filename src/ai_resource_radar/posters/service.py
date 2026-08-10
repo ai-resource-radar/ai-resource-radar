@@ -49,15 +49,14 @@ from .provider import (
     PosterRequest,
     _detect_image,
     _default_openclaw_binary,
-    _model_configuration_status,
     _model_is_formal_eligible,
     _read_image_file,
-    _openclaw_provider_configured,
-    configure_poster,
+    _openclaw_provider_configured as _provider_openclaw_provider_configured,
+    configure_poster as _provider_configure_poster,
     create_poster_generator,
-    list_poster_models,
+    list_poster_models as _provider_list_poster_models,
     poster_benchmark_status,
-    poster_configuration,
+    poster_configuration as _provider_poster_configuration,
     test_poster_model as _provider_test_poster_model,
 )
 from .report import (
@@ -70,13 +69,104 @@ from .report import (
     _safe_error,
     _save_webp,
     _upsert_failure,
-    daily_report_status,
+    daily_report_status as _report_daily_report_status,
     latest_daily_report,
     list_daily_reports,
     prune_daily_posters,
     resolve_daily_poster,
 )
 from .validation import MacOSVisionOCR, PosterValidation, validate_poster_text
+
+
+def _openclaw_provider_configured(
+    model: str,
+    *,
+    binary: str | Path | None = None,
+) -> tuple[bool, str | None]:
+    """Keep the legacy facade's subprocess and resolver patch points effective."""
+
+    return _provider_openclaw_provider_configured(
+        model,
+        binary=binary,
+        runner=subprocess.run,
+        binary_resolver=_default_openclaw_binary,
+    )
+
+
+def _model_configuration_status(
+    spec: ImageModelSpec,
+    *,
+    key_store: KeyStore | None = None,
+    openclaw_binary: str | Path | None = None,
+) -> tuple[bool, str | None]:
+    from .provider import _model_configuration_status as provider_status
+
+    return provider_status(
+        spec,
+        key_store=key_store,
+        openclaw_binary=openclaw_binary,
+        openclaw_checker=_openclaw_provider_configured,
+    )
+
+
+def poster_configuration(
+    path: Path,
+    *,
+    key_store: KeyStore | None = None,
+    openclaw_binary: str | Path | None = None,
+) -> dict[str, Any]:
+    return _provider_poster_configuration(
+        path,
+        key_store=key_store,
+        openclaw_binary=openclaw_binary,
+        configuration_status=_model_configuration_status,
+    )
+
+
+def list_poster_models(
+    path: Path,
+    *,
+    key_store: KeyStore | None = None,
+    openclaw_binary: str | Path | None = None,
+) -> tuple[dict[str, Any], ...]:
+    return _provider_list_poster_models(
+        path,
+        key_store=key_store,
+        openclaw_binary=openclaw_binary,
+        configuration_status=_model_configuration_status,
+    )
+
+
+def configure_poster(
+    path: Path,
+    *,
+    enabled: bool,
+    provider: str | None = None,
+    model: str | None = None,
+) -> dict[str, Any]:
+    return _provider_configure_poster(
+        path,
+        enabled=enabled,
+        provider=provider,
+        model=model,
+        configuration_status=_model_configuration_status,
+    )
+
+
+def daily_report_status(
+    path: Path,
+    *,
+    key_store: KeyStore | None = None,
+    current: date | None = None,
+    openclaw_binary: str | Path | None = None,
+) -> dict[str, Any]:
+    return _report_daily_report_status(
+        path,
+        key_store=key_store,
+        current=current,
+        openclaw_binary=openclaw_binary,
+        configuration_status=_model_configuration_status,
+    )
 
 
 def test_poster_model(**kwargs: Any) -> dict[str, Any]:

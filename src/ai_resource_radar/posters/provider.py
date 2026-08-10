@@ -480,12 +480,16 @@ def _openclaw_provider_configured(
     model: str,
     *,
     binary: str | Path | None = None,
+    runner: Any = None,
+    binary_resolver: Any = None,
 ) -> tuple[bool, str | None]:
-    executable = str(binary) if binary is not None else _default_openclaw_binary()
+    resolve_binary = binary_resolver or _default_openclaw_binary
+    run_command = runner or subprocess.run
+    executable = str(binary) if binary is not None else resolve_binary()
     if not executable:
         return False, "openclaw_unavailable"
     try:
-        completed = subprocess.run(
+        completed = run_command(
             [executable, "infer", "image", "providers", "--json"],
             capture_output=True,
             text=True,
@@ -695,13 +699,15 @@ def _model_configuration_status(
     *,
     key_store: KeyStore | None = None,
     openclaw_binary: str | Path | None = None,
+    openclaw_checker: Any = None,
 ) -> tuple[bool, str | None]:
     if spec.provider == POSTER_PROVIDER:
         if (key_store or KeychainStore()).get() is not None:
             return True, None
         return False, "openai_keychain_credential_missing"
     if spec.provider == OPENCLAW_POSTER_PROVIDER:
-        return _openclaw_provider_configured(spec.model, binary=openclaw_binary)
+        checker = openclaw_checker or _openclaw_provider_configured
+        return checker(spec.model, binary=openclaw_binary)
     return False, "poster_provider_unsupported"
 
 
@@ -710,6 +716,7 @@ def poster_configuration(
     *,
     key_store: KeyStore | None = None,
     openclaw_binary: str | Path | None = None,
+    configuration_status: Any = None,
 ) -> dict[str, Any]:
     metadata = _read_poster_metadata(path)
     provider = metadata.get(POSTER_PROVIDER_METADATA, POSTER_PROVIDER)
@@ -728,7 +735,8 @@ def poster_configuration(
             "reason": "poster_model_unsupported",
             "configuration_reason": "poster_model_unsupported",
         }
-    configured, configuration_reason = _model_configuration_status(
+    status_resolver = configuration_status or _model_configuration_status
+    configured, configuration_reason = status_resolver(
         spec,
         key_store=key_store,
         openclaw_binary=openclaw_binary,
@@ -750,13 +758,15 @@ def list_poster_models(
     *,
     key_store: KeyStore | None = None,
     openclaw_binary: str | Path | None = None,
+    configuration_status: Any = None,
 ) -> tuple[dict[str, Any], ...]:
     metadata = _read_poster_metadata(path)
     selected_provider = metadata.get(POSTER_PROVIDER_METADATA, POSTER_PROVIDER)
     selected_model = metadata.get(POSTER_MODEL_METADATA, POSTER_MODEL)
     result: list[dict[str, Any]] = []
     for spec in IMAGE_MODELS:
-        configured, configuration_reason = _model_configuration_status(
+        status_resolver = configuration_status or _model_configuration_status
+        configured, configuration_reason = status_resolver(
             spec,
             key_store=key_store,
             openclaw_binary=openclaw_binary,
@@ -781,6 +791,7 @@ def configure_poster(
     enabled: bool,
     provider: str | None = None,
     model: str | None = None,
+    configuration_status: Any = None,
 ) -> dict[str, Any]:
     current = _read_poster_metadata(path)
     selected_provider = provider or current.get(
@@ -807,7 +818,10 @@ def configure_poster(
             )
     finally:
         connection.close()
-    return poster_configuration(path)
+    return poster_configuration(
+        path,
+        configuration_status=configuration_status,
+    )
 
 
 def test_poster_model(
