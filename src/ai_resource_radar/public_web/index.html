@@ -41,7 +41,7 @@
           <span class="brand-mark" aria-hidden="true">AR</span>
           <span class="brand-copy">
             <strong>AI Resource Radar</strong>
-            <small>AI 资源雷达 · v0.4</small>
+            <small>AI 资源雷达 · v0.6</small>
           </span>
         </a>
         <div class="header-actions">
@@ -55,15 +55,15 @@
         </div>
       </div>
       <div class="shell nav-wrap">
-        <nav id="main-nav" class="tabs" aria-label="资源分类 / Resource categories">
-          <button class="tab is-active" type="button" data-tab="recommended" aria-selected="true"><span data-i18n="tabs.recommended">推荐 / Recommended</span></button>
-          <button class="tab" type="button" data-tab="token" aria-selected="false"><span data-i18n="tabs.token">免费 Token / Free tokens</span></button>
-          <button class="tab" type="button" data-tab="gpu" aria-selected="false"><span data-i18n="tabs.gpu">免费 GPU / Free GPU</span></button>
-          <button class="tab" type="button" data-tab="grant" aria-selected="false"><span data-i18n="tabs.grant">资助 / Grants</span></button>
-          <button class="tab" type="button" data-tab="token-prices" aria-selected="false"><span data-i18n="tabs.tokenPrices">Token 价格 / Token prices</span></button>
-          <button class="tab" type="button" data-tab="gpu-prices" aria-selected="false"><span data-i18n="tabs.gpuPrices">GPU 价格 / GPU prices</span></button>
-          <button class="tab" type="button" data-tab="changes" aria-selected="false"><span data-i18n="tabs.changes">变化 / Changes</span></button>
-          <button class="tab" type="button" data-tab="about" aria-selected="false"><span data-i18n="tabs.about">来源健康 / About</span></button>
+        <nav id="main-nav" class="tabs" role="tablist" aria-label="资源分类 / Resource categories">
+          <button id="tab-recommended" class="tab is-active" type="button" role="tab" data-tab="recommended" aria-controls="content" aria-selected="true"><span data-i18n="tabs.recommended">推荐 / Recommended</span></button>
+          <button id="tab-token" class="tab" type="button" role="tab" data-tab="token" aria-controls="content" aria-selected="false"><span data-i18n="tabs.token">免费 Token / Free tokens</span></button>
+          <button id="tab-gpu" class="tab" type="button" role="tab" data-tab="gpu" aria-controls="content" aria-selected="false"><span data-i18n="tabs.gpu">免费 GPU / Free GPU</span></button>
+          <button id="tab-grant" class="tab" type="button" role="tab" data-tab="grant" aria-controls="content" aria-selected="false"><span data-i18n="tabs.grant">资助 / Grants</span></button>
+          <button id="tab-token-prices" class="tab" type="button" role="tab" data-tab="token-prices" aria-controls="content" aria-selected="false"><span data-i18n="tabs.tokenPrices">Token 价格 / Token prices</span></button>
+          <button id="tab-gpu-prices" class="tab" type="button" role="tab" data-tab="gpu-prices" aria-controls="content" aria-selected="false"><span data-i18n="tabs.gpuPrices">GPU 价格 / GPU prices</span></button>
+          <button id="tab-changes" class="tab" type="button" role="tab" data-tab="changes" aria-controls="content" aria-selected="false"><span data-i18n="tabs.changes">变化 / Changes</span></button>
+          <button id="tab-about" class="tab" type="button" role="tab" data-tab="about" aria-controls="content" aria-selected="false"><span data-i18n="tabs.about">来源健康 / About</span></button>
         </nav>
       </div>
     </header>
@@ -144,7 +144,7 @@
         </div>
 
         <p id="load-status" class="load-status" role="status" aria-live="polite" data-i18n="status.loading">正在读取本地数据 / Loading local data…</p>
-        <div id="content" class="content-grid" aria-live="polite"></div>
+        <div id="content" class="content-grid" role="tabpanel" aria-live="polite" aria-labelledby="tab-recommended"></div>
         <button id="load-more" class="button button-quiet load-more" type="button" hidden>加载更多 / Load more</button>
       </section>
     </main>
@@ -156,6 +156,6 @@
       </div>
     </footer>
     <noscript>需要启用 JavaScript 才能读取静态数据。 JavaScript is required to read the static catalogue.</noscript>
-    <script src="./app.js" defer></script>
+    <script type="module" src="./app.js"></script>
   </body>
 </html>

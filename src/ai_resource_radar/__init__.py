@@ -1,6 +1,8 @@
 """Stable public facade for the deterministic AI Resource Radar core."""
 
-__version__ = "0.4.0"
+__version__ = "0.6.0"
+
+from ai_resource_radar.interfaces.http import ApiResponse, RadarDashboardPort
 
 from ai_resource_radar.doctor import DoctorCheck, DoctorReport, diagnose, run_doctor
 from ai_resource_radar.locks import (
@@ -66,6 +68,7 @@ from ai_resource_radar.tips import (
     seed_initial_tips,
     tips_summary,
 )
+from ai_resource_radar.interfaces.cli import CliContext, run_cli
 
 # Concise host-facing alias; the original name remains public and compatible.
 summary = radar_summary
@@ -73,6 +76,9 @@ summary = radar_summary
 __all__ = [
     "__version__",
     "SCHEMA_VERSION",
+    "ApiResponse",
+    "RadarDashboardPort",
+    "CliContext",
     "UnsupportedSchemaError",
     "DoctorCheck",
     "DoctorReport",
@@ -110,6 +116,7 @@ __all__ = [
     "refresh",
     "resolve_modalities",
     "run_doctor",
+    "run_cli",
     "source_freshness_status",
     "summary",
     "test_poster_model",

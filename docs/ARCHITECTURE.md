@@ -7,13 +7,26 @@ The project has two deliberately separated paths:
 
 Core modules:
 
-- `sources`, `runtime`, `store`: acquisition, parsing, migrations, evidence, changes, notifications, and retention.
+- `collection`: source models, the 23-source registry, allow-listed acquisition metadata, and
+  source-specific parsers. The historical `sources` path is a compatibility facade.
+- `persistence`: schema v7, migrations, repositories, evidence, changes, and retention. The
+  historical `store` path remains compatible.
+- `application`: refresh orchestration, failure isolation, change detection, and maintenance.
+  The historical `runtime` path remains compatible.
 - `pricing`: normalized token and GPU price queries.
-- `model_registry`, `poster`: provider/model capabilities, formal-poster eligibility, GPT Image 2 and OpenClaw adapters, Keychain access, five-fact selection, final-WebP OCR validation, retries, and storage.
+- `posters`: provider/model capabilities, formal-poster eligibility, GPT Image 2 and OpenClaw
+  adapters, Keychain access, fact selection, final-WebP OCR validation, benchmark, and records.
 - `doctor`, `locks`: version/schema/freshness diagnostics and process-safe refresh/poster/tip locks.
-- `tips`: deterministic official discovery, manual candidates, approval, managed AGENTS.md application, audit, and rollback.
-- `dashboard`, `dashboard_state`: loopback-only APIs and local static UI.
+- `tip_management`: deterministic official discovery, manual candidates, approval, managed
+  AGENTS.md application, audit, and rollback.
+- `interfaces`: a stable CLI dispatcher, host-neutral Dashboard port/router, and safe static-asset
+  resolver shared by standalone and embedded servers.
+- `dashboard`, `dashboard_state`: loopback transport and stateful background-task facade.
 - `service`: macOS LaunchAgents for the dashboard, menu bar, and daily workflow.
+
+The browser UI is dependency-free. Native modules separate API cancellation, URL state,
+formatters, components, and view renderers; CSS is split into token, base, layout, component,
+view, and responsive layers. Legacy `/ai-resources.js` and `/ai-resources.css` remain entry points.
 
 SQLite schema v7 adds transactional multi-tip application batches and the local poster benchmark/review audit while preserving all v6 resources, modalities, notifications, daily reports, tips, and evidence. CogView benchmark images are generated at the official 864×1152 portrait size, proportionally normalized to 1080×1440 WebP, and validated on the final file. Failed candidate images are temporary files and are never retained.
 

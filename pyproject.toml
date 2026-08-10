@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-resource-radar"
-version = "0.4.0"
+version = "0.6.0"
 description = "Daily-verified free AI tokens, GPU compute, grants, and prices with a local-first dashboard"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -40,6 +40,9 @@ ai_resource_radar = [
   "web/*.css",
   "web/*.js",
   "web/*.svg",
+  "web/modules/*.js",
+  "web/modules/views/*.js",
+  "web/styles/*.css",
   "public_web/*.html",
   "public_web/*.css",
   "public_web/*.js",
@@ -47,4 +50,6 @@ ai_resource_radar = [
   "public_web/*.xml",
   "public_web/*.svg",
   "public_web/*.png",
+  "public_web/modules/*.js",
+  "public_web/styles/*.css",
 ]

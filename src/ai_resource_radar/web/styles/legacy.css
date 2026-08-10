@@ -1,0 +1,7 @@
+/* Legacy stylesheet URL retained for hosts that still request this path. */
+@import url("/ai-radar-assets/styles/tokens.css");
+@import url("/ai-radar-assets/styles/base.css");
+@import url("/ai-radar-assets/styles/layout.css");
+@import url("/ai-radar-assets/styles/components.css");
+@import url("/ai-radar-assets/styles/views.css");
+@import url("/ai-radar-assets/styles/responsive.css");

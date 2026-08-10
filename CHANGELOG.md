@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.6.0 — 2026-08-10
+
+- Redesign the local Dashboard around four clear destinations: Free Resources, Price Rankings,
+  Daily Poster, and Tips. Recent changes remain available from the overview without competing for
+  a primary navigation slot.
+- Show exactly what each free offer provides, its entry requirements, the first claim step, and
+  explicit claim/detail actions. Render price rankings in compact desktop rows and responsive
+  mobile cards, with 20-row progressive loading instead of hundreds of DOM nodes at once.
+- Add a compact first screen, progressive price filters, actionable source health, and mobile-safe
+  navigation without a catch-all “More” menu.
+- Add native ES module and layered CSS boundaries, keyboard-visible focus, dialog focus return,
+  request cancellation, URL state, reduced-motion support, and a visually aligned public snapshot.
+- Make the standalone package the only source of Dashboard assets and HTTP/CLI behavior; embedding
+  hosts now supply only paths, ports, runtime labels, and host diagnostics.
+- Split collection, persistence, refresh orchestration, posters, and tip management behind stable
+  legacy module facades. SQLite remains schema v7 and existing JSON/error contracts remain intact.
+- Add a host-neutral `RadarDashboardPort`, shared HTTP router, safe nested asset resolver, and
+  context-aware CLI dispatcher.
+
 ## 0.4.0 — 2026-08-10
 
 - Expand the deterministic registry from 15 to 23 sources with official SambaNova, Mistral,

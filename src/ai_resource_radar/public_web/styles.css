@@ -1,3 +1,5 @@
+@import url("./radar-tokens.css");
+
 :root {
   color-scheme: light;
   --ink: #17231d;
@@ -41,6 +43,13 @@ button, input, select { font: inherit; }
 button, select { color: inherit; }
 button { cursor: pointer; }
 a { color: var(--green); }
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid var(--radar-focus);
+  outline-offset: 2px;
+}
 
 .shell { width: min(1240px, calc(100% - 40px)); margin-inline: auto; }
 .skip-link {
@@ -236,7 +245,7 @@ a { color: var(--green); }
   outline: none;
   font-size: 12px;
 }
-.filters input:focus, .filters select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(15, 107, 69, .12); }
+.filters input:focus, .filters select:focus { border-color: var(--radar-focus); box-shadow: var(--radar-focus-ring); }
 .load-status { min-height: 20px; margin: 0 0 12px; color: var(--muted); font-size: 12px; }
 .load-status.is-error { color: var(--red); }
 .load-more { display: block; margin: 24px auto 0; min-width: 180px; }

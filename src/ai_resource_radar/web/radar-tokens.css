@@ -1,0 +1,12 @@
+/* Shared semantic token names used by the local dashboard and public snapshot. */
+:root {
+  --radar-focus: #2563eb;
+  --radar-focus-ring: 0 0 0 3px rgb(37 99 235 / 24%);
+  --radar-surface-raised: #ffffff;
+  --radar-text-muted: #68736c;
+  --radar-border: #dfe5df;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { scroll-behavior: auto; }
+}

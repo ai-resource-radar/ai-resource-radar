@@ -1,0 +1,319 @@
+/* Page shell, header, hero, and catalogue layout. */
+.page-frame {
+  width: min(1240px, calc(100% - 48px));
+  margin-inline: auto;
+}
+
+.skip-link {
+  position: fixed;
+  z-index: 20;
+  top: -4rem;
+  left: 1rem;
+  padding: 9px 13px;
+  border-radius: 0 0 9px 9px;
+  background: var(--ink);
+  color: #fff;
+  text-decoration: none;
+  transition: top .15s ease;
+}
+
+.skip-link:focus { top: 0; }
+
+.radar-header {
+  position: sticky;
+  z-index: 12;
+  top: 0;
+  border-bottom: 1px solid rgba(42, 63, 49, .1);
+  background: rgba(248, 249, 246, .92);
+  backdrop-filter: blur(16px);
+}
+
+.header-inner {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.header-main,
+.header-actions,
+.radar-brand,
+.radar-nav,
+.health-pill,
+  .section-heading,
+  .catalog-tools,
+  .catalog-actions,
+  .provider-title,
+.provider-badges,
+.offer-heading,
+.offer-badges {
+  display: flex;
+  align-items: center;
+}
+
+.header-main { min-width: 0; }
+
+.radar-brand {
+  gap: 11px;
+  color: var(--ink);
+  font-weight: 760;
+  letter-spacing: -.02em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.radar-brand-mark {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--ink);
+  color: var(--lime);
+  font-size: 14px;
+  box-shadow: 0 7px 16px rgba(23, 32, 27, .16);
+}
+
+.radar-nav {
+  display: flex;
+  gap: 4px;
+  margin-left: 24px;
+  overflow: visible;
+}
+
+.radar-nav button {
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 9px;
+  padding: 9px 10px;
+  cursor: pointer;
+}
+
+.radar-nav button.active {
+  color: var(--ink);
+  background: rgba(255,255,255,.82);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.radar-nav button:focus-visible,
+.filter-toggle:focus-visible,
+.text-action:focus-visible,
+.side-link:focus-visible,
+.refresh-radar:focus-visible,
+.price-reset:focus-visible,
+.price-method:focus-visible,
+.dialog-close:focus-visible,
+.provider-dialog-item:focus-visible,
+.tip-card:focus-visible,
+.tip-review-actions button:focus-visible,
+.tip-import-open:focus-visible,
+.tip-refresh:focus-visible,
+.tip-rollback:focus-visible,
+.price-compare-bar button:focus-visible {
+  outline: 3px solid var(--radar-focus);
+  outline-offset: 2px;
+}
+
+.header-actions { gap: 11px; color: var(--muted); font-size: 13px; }
+
+.health-pill {
+  gap: 7px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.68);
+  border-radius: 99px;
+  padding: 7px 10px;
+  white-space: nowrap;
+}
+
+.health-pill.unhealthy .health-dot {
+  background: #d97706;
+  box-shadow: 0 0 0 4px rgba(217,119,6,.12);
+}
+
+.health-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #2f9e52;
+  box-shadow: 0 0 0 4px rgba(47,158,82,.12);
+}
+
+.refresh-radar {
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: white;
+  padding: 9px 13px;
+  border-radius: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.refresh-radar:disabled { cursor: wait; opacity: .55; }
+
+.radar-hero {
+  margin-top: 16px;
+  padding: 18px 28px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 32px;
+  overflow: hidden;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 88% 15%, rgba(85, 239, 145, .18), transparent 17rem),
+    #0d120f;
+  color: #f5fbf7;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: var(--lime);
+  font-weight: 750;
+  font-size: 12px;
+  letter-spacing: .11em;
+}
+
+.radar-hero h1 {
+  margin: 0;
+  max-width: 780px;
+  font-size: clamp(29px, 3vw, 38px);
+  line-height: 1.08;
+  letter-spacing: -.045em;
+  font-weight: 780;
+}
+
+.hero-copy {
+  max-width: 660px;
+  margin: 7px 0 0;
+  color: #aeb8b1;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.hero-trust {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.hero-trust[hidden] { display: none; }
+.hero-trust span {
+  border: 1px solid rgba(85, 239, 145, .22);
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: rgba(85, 239, 145, .07);
+  color: #bce9ca;
+  font-size: 11px;
+}
+
+.hero-pick {
+  min-width: 220px;
+  border-left: 1px solid rgba(255,255,255,.13);
+  padding-left: 24px;
+  margin-bottom: 0;
+  color: #95a199;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.hero-pick strong,
+.hero-pick small { display: block; }
+.hero-pick strong { color: white; font-size: 17px; letter-spacing: -.03em; }
+.hero-pick small { margin-top: 2px; }
+
+.radar-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+  background: transparent;
+}
+
+.radar-metric {
+  min-height: 54px;
+  padding: 8px 13px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255,255,255,.8);
+}
+
+.radar-metric > span { color: var(--muted); display: block; margin-bottom: 2px; font-size: 10px; }
+.radar-metric strong { font-size: 18px; letter-spacing: -.03em; }
+.radar-metric small { color: var(--green); font-size: 12px; margin-left: 7px; }
+
+.ai-skeleton,
+.feature-skeleton {
+  background: linear-gradient(90deg, #f4f5f3 25%, #eaeeeb 50%, #f4f5f3 75%);
+  background-size: 200% 100%;
+  animation: radar-shimmer 1.4s infinite;
+}
+
+.ai-skeleton { min-height: 62px; border-radius: 12px; }
+.feature-skeleton { min-height: 240px; border-radius: 16px; }
+@keyframes radar-shimmer { to { background-position: -200% 0; } }
+
+.radar-main { padding-block: 14px 80px; }
+.featured-section { margin-bottom: 30px; }
+
+.view-subnav {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.view-subnav[hidden],
+.view-subnav-group[hidden] { display: none; }
+
+.view-subnav-group {
+  display: inline-flex;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 4px;
+  background: rgba(255,255,255,.72);
+}
+
+.view-subnav button {
+  min-height: 30px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 13px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.view-subnav button.active {
+  background: var(--ink);
+  color: white;
+}
+
+.section-heading {
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 11px;
+}
+
+.section-heading h2 { margin: 0; font-size: 19px; letter-spacing: -.025em; }
+.section-heading p { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
+
+.text-action,
+.side-link {
+  border: 0;
+  background: transparent;
+  color: var(--green);
+  font-weight: 680;
+  cursor: pointer;
+}
+
+.featured-resources {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}

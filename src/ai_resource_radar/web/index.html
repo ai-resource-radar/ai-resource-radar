@@ -8,9 +8,10 @@
     <meta name="description" content="本地保存、官方核验的 AI 免费 Token、GPU 与资助活动">
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="/ai-resources.css">
-    <script src="/ai-resources.js" defer></script>
+    <script type="module" src="/ai-resources.js"></script>
   </head>
   <body>
+    <a class="skip-link" href="#main-content">跳到内容</a>
     <header class="radar-header">
       <div class="page-frame header-inner">
         <div class="header-main">
@@ -18,39 +19,39 @@
             <span class="radar-brand-mark" aria-hidden="true">AI</span>
             <span>免费资源雷达</span>
           </a>
-          <nav class="radar-nav" aria-label="AI 资源分类">
-            <button class="active" type="button" data-view="recommended">精选</button>
-            <button type="button" data-view="token">免费 Token</button>
-            <button type="button" data-view="gpu">免费 GPU</button>
-            <button type="button" data-view="token-prices">Token 价格</button>
-            <button type="button" data-view="gpu-prices">GPU 价格</button>
-            <button type="button" data-view="grant">资助</button>
-            <button type="button" data-view="poster">日报海报</button>
-            <button type="button" data-view="tips">AI 效率技巧</button>
-            <button type="button" data-view="changes">变化</button>
+          <nav id="main-nav" class="radar-nav" aria-label="主要功能">
+            <button class="active" type="button" data-view="recommended" data-view-group="resources" aria-current="page">免费资源</button>
+            <button type="button" data-view="token-prices" data-view-group="pricing">价格榜单</button>
+            <button type="button" data-view="poster" data-view-group="poster" aria-label="日报海报">日报</button>
+            <button type="button" data-view="tips" data-view-group="tips" aria-label="AI 效率技巧">技巧</button>
           </nav>
         </div>
         <div class="header-actions">
           <span id="last-verified" class="last-verified">等待首次核验</span>
-          <span id="source-health" class="health-pill">
+          <span id="source-health" class="health-pill" role="status" aria-live="polite">
             <span class="health-dot" aria-hidden="true"></span>
             <span>读取来源状态</span>
           </span>
-          <button id="refresh-radar" class="refresh-radar" type="button">重新核验</button>
+          <button id="refresh-radar" class="refresh-radar" type="button" title="重新核验全部来源">更新数据</button>
         </div>
       </div>
     </header>
 
     <section class="page-frame radar-hero">
       <div>
-        <p id="hero-eyebrow" class="eyebrow">TODAY'S FREE AI PICKS</p>
-        <h1 id="hero-title">今天有什么<br>值得白嫖？</h1>
-        <p id="hero-copy" class="hero-copy">先看清楚具体送什么、多久恢复、有哪些门槛，再照着操作步骤直接开始用。每项政策都保留官方核验依据。</p>
+        <p id="hero-eyebrow" class="eyebrow">VERIFIED FREE AI · UPDATED DAILY</p>
+        <h1 id="hero-title">今天有哪些真正能领的免费 AI 资源？</h1>
+        <p id="hero-copy" class="hero-copy">额度、门槛和领取入口一次看清；每项结论都能回到官方证据。</p>
+        <div class="hero-trust" aria-label="资源筛选原则">
+          <span>官方核验</span>
+          <span>无需信用卡优先</span>
+          <span>大陆可用优先</span>
+        </div>
       </div>
       <div class="hero-pick">
-        <span id="hero-pick-label">今日首选</span>
-        <strong id="hero-pick-title">正在挑选…</strong>
-        <small id="hero-pick-note">按免费价值与使用门槛排序</small>
+        <span id="hero-pick-label">今日精选</span>
+        <strong id="hero-pick-title">正在筛选 3 项资源</strong>
+        <small id="hero-pick-note">按免费价值、门槛和大陆可用性排序</small>
       </div>
     </section>
 
@@ -61,12 +62,25 @@
       <div class="ai-skeleton"></div>
     </section>
 
-    <main class="page-frame radar-main">
+    <main id="main-content" class="page-frame radar-main">
+      <nav id="view-subnav" class="view-subnav" aria-label="当前栏目分类">
+        <div id="resource-subnav" class="view-subnav-group">
+          <button class="active" type="button" data-view="recommended">全部精选</button>
+          <button type="button" data-view="token">免费 Token</button>
+          <button type="button" data-view="gpu">免费 GPU</button>
+          <button type="button" data-view="grant">资助活动</button>
+        </div>
+        <div id="price-subnav" class="view-subnav-group" hidden>
+          <button type="button" data-view="token-prices">Token 价格</button>
+          <button type="button" data-view="gpu-prices">GPU 价格</button>
+        </div>
+      </nav>
+
       <section id="featured-section" class="featured-section">
         <div class="section-heading">
           <div>
             <h2>今天最值得领</h2>
-            <p>卡片直接告诉你政策内容和领取路径</p>
+            <p>三项不同供应商，可直接开始申请</p>
           </div>
           <button id="ranking-explainer" class="text-action" type="button">为什么推荐这些？</button>
         </div>
@@ -89,21 +103,16 @@
         <div class="browser-grid">
           <section class="catalog-panel" aria-labelledby="catalog-title">
             <div class="catalog-tools">
-              <div class="catalog-view-chips" aria-label="资源类别快捷筛选">
-                <button class="active" type="button" data-view="recommended">全部</button>
-                <button type="button" data-view="token">Token</button>
-                <button type="button" data-view="gpu">GPU</button>
-                <button type="button" data-view="token-prices">Token 价格</button>
-                <button type="button" data-view="gpu-prices">GPU 价格</button>
-                <button type="button" data-view="grant">资助</button>
-                <button type="button" data-view="poster">日报</button>
-                <button type="button" data-view="tips">效率技巧</button>
-              </div>
               <div class="catalog-actions">
                 <label class="radar-search">
                   <span class="sr-only">搜索供应商或资源</span>
-                  <input id="radar-query" type="search" maxlength="100" placeholder="搜索资源">
+                  <input id="radar-query" type="search" maxlength="100" placeholder="搜索供应商、模型或额度">
                 </label>
+                <div id="free-quick-filters" class="quick-filters" aria-label="快速筛选">
+                  <label><input id="verified-only" type="checkbox" checked> 官方核验</label>
+                  <label><input id="no-card" type="checkbox" checked> 无需信用卡</label>
+                  <label><input id="mainland-supported" type="checkbox" checked> 大陆可用</label>
+                </div>
                 <button id="toggle-filters" class="filter-toggle" type="button" aria-expanded="false">
                   更多筛选
                 </button>
@@ -111,6 +120,10 @@
             </div>
 
             <div id="pricing-controls" class="pricing-controls" hidden>
+              <div class="pricing-controls-header">
+                <span class="pricing-controls-title">价格筛选</span>
+                <button id="toggle-price-filters" class="filter-toggle" type="button" aria-expanded="false" aria-controls="pricing-advanced">展开高级筛选</button>
+              </div>
               <label>
                 <span>排序</span>
                 <select id="pricing-sort" aria-label="价格排序方式"></select>
@@ -128,6 +141,7 @@
                   <option value="">全部供应商</option>
                 </select>
               </label>
+              <div id="pricing-advanced" class="pricing-advanced" hidden>
               <label class="token-price-control" hidden>
                 <span>核验级别</span>
                 <select id="token-verification" aria-label="Token 价格核验级别">
@@ -214,22 +228,20 @@
                   <option value="100">100 小时</option>
                 </select>
               </label>
+              </div>
               <button id="reset-pricing-filters" class="price-reset" type="button">重置筛选</button>
               <button id="pricing-method" class="price-method" type="button">比较口径说明</button>
               <div id="pricing-filter-summary" class="pricing-filter-summary" aria-live="polite"></div>
             </div>
 
-            <div class="radar-filters" aria-label="资源过滤" hidden>
-              <label><input id="verified-only" type="checkbox" checked> 官方已核验</label>
-              <label><input id="no-card" type="checkbox" checked> 无需信用卡</label>
+            <div class="radar-filters" aria-label="更多资源过滤" hidden>
               <label><input id="free-image-generation" type="checkbox"> 免费生图</label>
-              <label><input id="mainland-supported" type="checkbox" checked> 大陆可用</label>
               <label><input id="mainland-unknown" type="checkbox" checked> 大陆情况未知</label>
               <label><input id="mainland-unsupported" type="checkbox"> 官方不支持大陆</label>
             </div>
 
-            <div id="refresh-state" class="refresh-state" hidden></div>
-            <div id="radar-results" class="radar-results" aria-live="polite">
+            <div id="refresh-state" class="refresh-state" role="status" aria-live="polite" hidden></div>
+            <div id="radar-results" class="radar-results" aria-live="polite" aria-busy="false">
               <div class="radar-empty">正在读取本地资源库…</div>
             </div>
           </section>
@@ -241,17 +253,19 @@
               <div id="change-preview">
                 <div class="mini-empty">正在读取变化记录…</div>
               </div>
-              <button class="side-link" type="button" data-view="changes">查看全部变化 →</button>
+              <button class="side-link" type="button" data-open-view="changes">查看更新动态 →</button>
             </section>
 
-            <section class="side-card">
-              <h3>来源状态</h3>
-              <p>官方每日核验，社区目录每周刷新</p>
-              <div class="source-bar"><span id="source-health-bar"></span></div>
-              <div class="source-footer">
-                <span id="healthy-source-count">正在读取</span>
-                <span id="failed-source-count"></span>
-              </div>
+            <section class="side-card source-health-card">
+              <details id="source-health-disclosure" class="source-health-disclosure">
+                <summary><span>来源状态</span><span class="disclosure-hint">展开</span></summary>
+                <p>官方每日核验，社区目录每周刷新</p>
+                <div class="source-bar" aria-label="新鲜来源比例"><span id="source-health-bar"></span></div>
+                <div class="source-footer">
+                  <span id="healthy-source-count">正在读取</span>
+                  <span id="failed-source-count"></span>
+                </div>
+              </details>
             </section>
           </aside>
         </div>
@@ -266,7 +280,7 @@
       </div>
     </div>
 
-    <dialog id="offer-dialog" class="offer-dialog">
+    <dialog id="offer-dialog" class="offer-dialog" aria-modal="true" aria-label="详情">
       <button id="close-offer-dialog" class="dialog-close" type="button" aria-label="关闭">×</button>
       <div id="offer-detail"></div>
     </dialog>

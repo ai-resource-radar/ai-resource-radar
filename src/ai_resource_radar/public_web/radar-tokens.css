@@ -1,0 +1,12 @@
+/* Keep public and local surfaces on the same semantic token vocabulary. */
+:root {
+  --radar-focus: #2563eb;
+  --radar-focus-ring: 0 0 0 3px rgb(37 99 235 / 24%);
+  --radar-surface-raised: #ffffff;
+  --radar-text-muted: #64746a;
+  --radar-border: #dce6df;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { scroll-behavior: auto; }
+}

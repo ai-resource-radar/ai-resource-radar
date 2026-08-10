@@ -1,6 +1,9 @@
 name: Publish public radar
 
 on:
+  push:
+    branches:
+      - main
   schedule:
     # Keep the public snapshot close to the start of the UTC day.
     - cron: "20 0 * * *"

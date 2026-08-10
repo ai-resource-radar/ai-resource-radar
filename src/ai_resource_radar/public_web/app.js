@@ -1,4 +1,6 @@
 /* AI Resource Radar public site: static, read-only, and deliberately dependency-free. */
+import { readStaticRoute, writeStaticRoute } from "./ui-modules.js";
+
 (function () {
   "use strict";
 
@@ -84,6 +86,7 @@
     }
   };
   const state = { locale: "zh-CN", tab: "recommended", data: {}, rows: [], filtered: [], limit: 100 };
+  const validTabs = new Set(["recommended", "token", "gpu", "grant", "token-prices", "gpu-prices", "changes", "about"]);
   const $ = (id) => document.getElementById(id);
   const text = (value) => value == null || value === "" ? "—" : String(value);
   const t = (key) => (COPY[state.locale] && COPY[state.locale][key]) || key;
@@ -146,22 +149,30 @@
     });
   };
   function saveUrl() {
-    const params = new URLSearchParams();
-    params.set("tab", state.tab);
-    if ($("search-input").value) params.set("q", $("search-input").value);
-    ["provider-filter", "verification-filter", "card-filter", "mainland-filter", "sort-filter"].forEach((id) => { const v = $(id).value; if (v && v !== "all" && v !== "recommended") params.set(id.replace("-filter", ""), v); });
-    history.replaceState(null, "", `${location.pathname}?${params.toString()}`);
+    writeStaticRoute({ tab: state.tab, query: $("search-input").value });
+    const url = new URL(window.location.href);
+    ["provider-filter", "verification-filter", "card-filter", "mainland-filter", "sort-filter"].forEach((id) => {
+      const value = $(id).value;
+      const key = id.replace("-filter", "");
+      if (value && value !== "all" && value !== "recommended") url.searchParams.set(key, value);
+      else url.searchParams.delete(key);
+    });
+    history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
   }
   function readUrl() {
     const p = new URLSearchParams(location.search);
-    state.tab = p.get("tab") || "recommended";
-    $("search-input").value = p.get("q") || "";
+    const route = readStaticRoute(validTabs);
+    state.tab = route.tab;
+    $("search-input").value = route.query;
     ["provider-filter", "verification-filter", "card-filter", "mainland-filter", "sort-filter"].forEach((id) => { const v = p.get(id.replace("-filter", "")); if (v && $(id).querySelector(`option[value="${CSS.escape(v)}"]`)) $(id).value = v; });
   }
   function setLanguage(locale) {
     state.locale = locale === "en" ? "en" : "zh-CN";
     localStorage.setItem("ai-radar-locale", state.locale);
     document.documentElement.lang = state.locale;
+    document.title = state.locale === "en"
+      ? "AI Resource Radar — Verified free AI and prices"
+      : "AI Resource Radar — AI 免费资源与价格雷达";
     document.querySelectorAll("[data-i18n]").forEach((node) => {
       const key = node.dataset.i18n;
       if (COPY[state.locale][key]) node.textContent = COPY[state.locale][key];
@@ -244,18 +255,31 @@
     state.filtered = sortRows(rows); return state.filtered;
   }
   function render() {
-    document.querySelectorAll(".tab").forEach((tab) => { const active = tab.dataset.tab === state.tab; tab.classList.toggle("is-active", active); tab.setAttribute("aria-selected", String(active)); });
+    document.querySelectorAll(".tab").forEach((tab) => {
+      const active = tab.dataset.tab === state.tab;
+      tab.classList.toggle("is-active", active);
+      tab.setAttribute("aria-selected", String(active));
+      tab.tabIndex = active ? 0 : -1;
+      if (active) $("content").setAttribute("aria-labelledby", tab.id);
+    });
     const about = state.tab === "about"; const changes = state.tab === "changes";
     document.querySelector(".filters").hidden = about;
     $("download-json").hidden = about; $("download-csv").hidden = about;
-    renderSummary(); const root = $("content"); root.replaceChildren();
-    if (about) { renderAbout(); return; }
+    renderSummary(); const root = $("content"); root.setAttribute("aria-busy", "true"); root.replaceChildren();
+    if (about) {
+      renderAbout();
+      $("load-status").textContent = `${t("loaded")}: ${(state.data.sources && state.data.sources.items || []).length}`;
+      root.setAttribute("aria-busy", "false");
+      saveUrl();
+      return;
+    }
     const rows = filterRows();
     const visible = state.tab === "recommended" ? 12 : state.limit;
     if (changes) renderChanges(rows); else rows.slice(0, visible).forEach(renderCard);
     $("load-status").textContent = `${t("loaded")}: ${Math.min(rows.length, visible)} / ${rows.length}`;
     $("load-more").textContent = t("loadMore");
     $("load-more").hidden = about || changes || rows.length <= visible;
+    root.setAttribute("aria-busy", "false");
     saveUrl();
   }
   function updateProviders() {
@@ -265,17 +289,30 @@
     if (values.includes(previous)) select.value = previous;
   }
   async function load() {
+    $("load-status").setAttribute("aria-busy", "true");
     try {
       const entries = await Promise.all(Object.entries(DATA).map(async ([key, url]) => [key, await fetch(url, { cache: "no-store" }).then((response) => { if (!response.ok) throw new Error(response.status); return response.json(); })]));
       entries.forEach(([key, value]) => { state.data[key] = value; });
       $("health-label").textContent = (state.data.manifest || {}).status === "partial" ? t("partial") : t("health");
-      updateProviders(); readUrl(); render();
+      readUrl(); updateProviders(); readUrl(); render();
     } catch (_) { $("health-label").textContent = t("failed"); $("load-status").textContent = t("failed"); }
+    finally { $("load-status").setAttribute("aria-busy", "false"); }
   }
   document.addEventListener("DOMContentLoaded", () => {
     state.locale = localStorage.getItem("ai-radar-locale") || (/^en/i.test(navigator.language) ? "en" : "zh-CN");
     $("language-toggle").addEventListener("click", () => setLanguage(state.locale === "en" ? "zh-CN" : "en"));
-    document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => { state.tab = tab.dataset.tab; state.limit = 100; updateProviders(); render(); }));
+    const tabs = [...document.querySelectorAll(".tab")];
+    tabs.forEach((tab) => tab.addEventListener("click", () => { state.tab = tab.dataset.tab; state.limit = 100; updateProviders(); render(); }));
+    $("main-nav").addEventListener("keydown", (event) => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      const current = Math.max(0, tabs.indexOf(document.activeElement));
+      const target = event.key === "Home" ? 0
+        : event.key === "End" ? tabs.length - 1
+          : (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+      tabs[target].focus();
+      tabs[target].click();
+    });
     ["search-input", "provider-filter", "verification-filter", "card-filter", "mainland-filter", "sort-filter"].forEach((id) => $(id).addEventListener("input", () => { state.limit = 100; render(); }));
     $("load-more").addEventListener("click", () => { state.limit += 100; render(); });
     $("clear-filters").addEventListener("click", () => { $("search-input").value = ""; ["provider-filter", "verification-filter", "card-filter", "mainland-filter", "sort-filter"].forEach((id) => { if (id === "provider-filter") $(id).value = ""; else if (id === "sort-filter") $(id).value = "recommended"; else $(id).value = "all"; }); render(); });

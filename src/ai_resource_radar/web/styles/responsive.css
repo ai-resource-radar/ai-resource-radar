@@ -1,0 +1,130 @@
+/* Mobile layout and reduced-motion behavior. */
+@media (max-width: 1360px) {
+  .radar-nav { gap: 6px; }
+  .last-verified { display: none; }
+}
+
+@media (max-width: 940px) {
+  .header-inner { gap: 10px; padding-block: 9px; }
+  .header-main { min-width: 0; flex: 1; }
+  .radar-nav {
+    min-width: 0;
+    margin-left: 14px;
+  }
+  .radar-hero { grid-template-columns: 1fr; }
+  .hero-pick { border-left: 0; padding-left: 0; }
+  .featured-resources,
+  .browser-grid { grid-template-columns: 1fr; }
+  .poster-layout { grid-template-columns: 1fr; }
+  .poster-history { border-left: 0; border-top: 1px solid rgba(255,255,255,.11); padding: 22px 0 0; }
+}
+
+@media (max-width: 680px) {
+  .page-frame { width: min(100% - 28px, 1240px); }
+  .header-inner { position: relative; min-height: 58px; padding-block: 8px; }
+  .header-main { padding-right: 43px; }
+  .radar-brand > span:last-child,
+  .health-pill { display: none; }
+  .radar-brand-mark { width: 32px; height: 32px; }
+  .radar-nav { margin-left: 8px; gap: 1px; }
+  .radar-nav button { min-height: 44px; padding-inline: 8px; font-size: 12px; }
+  .header-actions { position: absolute; top: 7px; right: 0; }
+  .refresh-radar { width: 44px; height: 44px; padding: 0; overflow: hidden; font-size: 0; }
+  .refresh-radar::before { content: "↻"; font-size: 18px; }
+  .radar-hero { margin-top: 14px; padding: 23px 20px; border-radius: 18px; }
+  .radar-hero h1 { font-size: 33px; }
+  .hero-copy { font-size: 14px; }
+  .hero-pick { display: none; }
+  .hero-trust { gap: 6px; margin-top: 14px; }
+  .hero-trust span { padding: 4px 7px; font-size: 10px; }
+  .radar-summary {
+    grid-template-columns: repeat(4, minmax(136px, 1fr));
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+  }
+  .radar-metric { scroll-snap-align: start; }
+  .radar-main { padding-top: 16px; }
+  .view-subnav { margin-bottom: 14px; overflow-x: auto; }
+  .view-subnav-group { flex: 0 0 auto; }
+  .view-subnav button { padding-inline: 11px; }
+  .featured-section { margin-bottom: 24px; }
+  .section-heading { align-items: flex-start; }
+  .section-heading h2 { font-size: 19px; }
+  .text-action { max-width: 110px; text-align: right; }
+  .catalog-tools { align-items: stretch; flex-direction: column; }
+  .catalog-actions { align-items: stretch; justify-content: space-between; }
+  .radar-search { flex: 1 0 100%; }
+  .radar-search input { width: 100%; }
+  .quick-filters { flex: 1 1 auto; flex-wrap: nowrap; overflow-x: auto; }
+  .quick-filters label { flex: 0 0 auto; }
+  .pricing-controls { align-items: stretch; }
+  .pricing-controls-header { flex-basis: 100%; }
+  .pricing-controls label { flex: 1 1 135px; }
+  .pricing-controls select,
+  .pricing-controls input { width: 100%; min-width: 0; }
+  .price-reset,
+  .price-method { flex: 1; margin-left: 0; }
+  .pricing-intro { align-items: flex-start; flex-direction: column; gap: 9px; }
+  .catalog-panel:has(.price-table) { background: var(--canvas); }
+  .price-table {
+    min-width: 0;
+    display: grid;
+    gap: 10px;
+    padding: 10px;
+  }
+  .price-table-head { display: none; }
+  .price-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 13px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px;
+    background: white;
+    box-shadow: 0 7px 24px rgba(24, 31, 26, .04);
+  }
+  .price-row:last-child { border-bottom: 1px solid var(--line); }
+  .price-load-more-wrap {
+    margin: 0 -10px -10px;
+    border-top: 1px solid var(--line);
+  }
+  .price-identity { grid-column: 1 / -1; }
+  .price-cell::before { content: attr(data-label); display: block; margin-bottom: 4px; color: var(--muted); font-size: 9px; }
+  .price-source { align-content: start; }
+  .price-compare-toggle { align-content: center; justify-items: start; grid-template-columns: auto auto; }
+  .feature-card { min-height: 246px; }
+  .feature-threshold { white-space: normal; }
+  .provider-row { grid-template-columns: 1fr; gap: 11px; }
+  .provider-guide-action { justify-content: flex-start; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid var(--line); text-align: left; }
+  .provider-guide-action small { flex: 1 0 100%; }
+  .detail-grid { grid-template-columns: 1fr; }
+  .detail-grid.compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .policy-actions { align-items: stretch; flex-direction: column; }
+  .provider-list-heading { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .change-row { grid-template-columns: 1fr; gap: 4px; }
+  .poster-layout { padding: 16px; }
+  .poster-stage-heading { align-items: flex-start; flex-direction: column; }
+  .poster-benchmark-heading { flex-direction: column; }
+  .poster-benchmark-actions { width: 100%; flex-wrap: wrap; }
+  .poster-generate { width: 100%; }
+  .poster-actions { align-items: flex-start; flex-direction: column; }
+  .tips-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tip-audit-row { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 360px) {
+  .radar-brand { display: none; }
+  .header-main { padding-right: 41px; }
+  .radar-nav { margin-left: 0; }
+  .radar-nav button { padding-inline: 7px; font-size: 11px; }
+  .radar-hero h1 { font-size: 29px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+  }
+}

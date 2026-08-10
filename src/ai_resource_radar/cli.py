@@ -5,6 +5,7 @@ import getpass
 import json
 from pathlib import Path
 import sys
+from typing import Any
 
 from ai_resource_radar.dashboard import serve
 from ai_resource_radar.doctor import diagnose
@@ -47,23 +48,26 @@ from ai_resource_radar.tips import (
     rollback_tip_application,
     seed_initial_tips,
 )
+from ai_resource_radar.interfaces.cli import CliContext
 
-
-def _parser() -> argparse.ArgumentParser:
+def _parser(context: CliContext | None = None) -> argparse.ArgumentParser:
+    context = context or CliContext()
+    database = context.database or default_database_path()
     parser = argparse.ArgumentParser(
         prog="ai-radar",
         description="确定性采集 AI 免费资源与价格，并可生成纯图片日报。",
     )
     actions = parser.add_subparsers(dest="action", required=True)
     refresh_parser = actions.add_parser("refresh", help="刷新本地资源库")
-    refresh_parser.add_argument("--database", type=Path, default=default_database_path())
+    refresh_parser.add_argument("--database", type=Path, default=database)
     refresh_parser.add_argument("--source", action="append", choices=tuple(SOURCE_BY_ID))
     refresh_parser.add_argument("--timeout", type=float, default=20)
     refresh_parser.add_argument("--force", action="store_true")
     refresh_parser.add_argument("--official-only", action="store_true")
+    refresh_parser.add_argument("--output", type=Path)
 
     list_parser = actions.add_parser("list", help="查看当前资源")
-    list_parser.add_argument("--database", type=Path, default=default_database_path())
+    list_parser.add_argument("--database", type=Path, default=database)
     list_parser.add_argument("--kind", choices=("token", "gpu", "grant"))
     list_parser.add_argument("--verified-only", action="store_true")
     list_parser.add_argument("--no-card", action="store_true")
@@ -72,16 +76,24 @@ def _parser() -> argparse.ArgumentParser:
     list_parser.add_argument("--query")
     list_parser.add_argument("--limit", type=int, default=100)
     list_parser.add_argument("--offset", type=int, default=0)
+    list_parser.add_argument("--only-free", action="store_true")
+    list_parser.add_argument(
+        "--format",
+        choices=("markdown", "json"),
+        default=context.list_format,
+    )
+    list_parser.add_argument("--output", type=Path)
 
     changes_parser = actions.add_parser("changes", help="查看变化历史")
-    changes_parser.add_argument("--database", type=Path, default=default_database_path())
+    changes_parser.add_argument("--database", type=Path, default=database)
     changes_parser.add_argument("--days", type=int, default=30)
     changes_parser.add_argument("--limit", type=int, default=100)
+    changes_parser.add_argument("--output", type=Path)
 
     tips = actions.add_parser("tips", help="发现、审核并应用 AI 效率技巧")
     tip_actions = tips.add_subparsers(dest="tips_action", required=True)
     tip_list = tip_actions.add_parser("list", help="查看技巧")
-    tip_list.add_argument("--database", type=Path, default=default_database_path())
+    tip_list.add_argument("--database", type=Path, default=database)
     tip_list.add_argument("--status", choices=("candidate", "approved", "rejected", "retired"))
     tip_list.add_argument("--category", choices=tuple(sorted(TIP_CATEGORIES)))
     tip_list.add_argument("--query")
@@ -89,10 +101,10 @@ def _parser() -> argparse.ArgumentParser:
     tip_list.add_argument("--offset", type=int, default=0)
     tip_show = tip_actions.add_parser("show", help="查看技巧详情")
     tip_show.add_argument("tip_id")
-    tip_show.add_argument("--database", type=Path, default=default_database_path())
+    tip_show.add_argument("--database", type=Path, default=database)
     for action_name in ("import", "add"):
         tip_add = tip_actions.add_parser(action_name, help="手动导入结构化技巧")
-        tip_add.add_argument("--database", type=Path, default=default_database_path())
+        tip_add.add_argument("--database", type=Path, default=database)
         tip_add.add_argument(
             "--url" if action_name == "import" else "--source-url",
             required=action_name == "import",
@@ -107,51 +119,54 @@ def _parser() -> argparse.ArgumentParser:
         tip_add.add_argument("--risk", choices=("low", "medium", "high"), default="medium")
     tip_approve = tip_actions.add_parser("approve", help="批准并自动应用技巧")
     tip_approve.add_argument("tip_id")
-    tip_approve.add_argument("--database", type=Path, default=default_database_path())
+    tip_approve.add_argument("--database", type=Path, default=database)
     tip_approve.add_argument("--scope", required=True, choices=("global", "project", "both"))
     tip_approve_batch = tip_actions.add_parser("approve-batch", help="事务性批准并应用一组技巧")
     tip_approve_batch.add_argument("tip_ids", nargs="+")
-    tip_approve_batch.add_argument("--database", type=Path, default=default_database_path())
+    tip_approve_batch.add_argument("--database", type=Path, default=database)
     tip_approve_batch.add_argument("--scope", required=True, choices=("global", "project", "both"))
     tip_approve_batch.add_argument("--adopt-existing", action="store_true")
     tip_reject = tip_actions.add_parser("reject", help="拒绝候选技巧")
     tip_reject.add_argument("tip_id")
-    tip_reject.add_argument("--database", type=Path, default=default_database_path())
+    tip_reject.add_argument("--database", type=Path, default=database)
     tip_reject.add_argument("--reason", default="")
     tip_apps = tip_actions.add_parser("applications", help="查看规则应用记录")
-    tip_apps.add_argument("--database", type=Path, default=default_database_path())
+    tip_apps.add_argument("--database", type=Path, default=database)
     tip_apps.add_argument("--limit", type=int, default=100)
     tip_batches = tip_actions.add_parser("batches", help="查看技巧应用批次")
-    tip_batches.add_argument("--database", type=Path, default=default_database_path())
+    tip_batches.add_argument("--database", type=Path, default=database)
     tip_batches.add_argument("--limit", type=int, default=100)
     tip_rollback = tip_actions.add_parser("rollback", help="恢复应用前的 AGENTS.md")
     tip_rollback.add_argument("application_id", type=int)
-    tip_rollback.add_argument("--database", type=Path, default=default_database_path())
+    tip_rollback.add_argument("--database", type=Path, default=database)
     tip_rollback_batch = tip_actions.add_parser("rollback-batch", help="整组恢复应用前的 AGENTS.md")
     tip_rollback_batch.add_argument("batch_id")
-    tip_rollback_batch.add_argument("--database", type=Path, default=default_database_path())
+    tip_rollback_batch.add_argument("--database", type=Path, default=database)
     tip_refresh = tip_actions.add_parser("refresh", help="核验官方技巧来源")
-    tip_refresh.add_argument("--database", type=Path, default=default_database_path())
+    tip_refresh.add_argument("--database", type=Path, default=database)
     tip_refresh.add_argument("--force", action="store_true")
     tip_refresh.add_argument("--timeout", type=float, default=20)
 
     daily = actions.add_parser("daily", help="刷新雷达并生成日报")
-    daily.add_argument("--database", type=Path, default=default_database_path())
+    daily.add_argument("--database", type=Path, default=database)
     daily.add_argument("--timeout", type=float, default=20)
     daily.add_argument("--force-refresh", action="store_true")
+    daily.add_argument("--poster-provider", choices=("openai", "openclaw"))
+    daily.add_argument("--output", type=Path)
 
     poster = actions.add_parser("poster", help="管理纯图片日报")
     poster_actions = poster.add_subparsers(dest="poster_action", required=True)
     generate = poster_actions.add_parser("generate")
-    generate.add_argument("--database", type=Path, default=default_database_path())
+    generate.add_argument("--database", type=Path, default=database)
     generate.add_argument("--force", action="store_true")
     generate.add_argument("--provider", choices=("openai", "openclaw"))
     generate.add_argument("--model")
+    generate.add_argument("--output", type=Path)
     models = poster_actions.add_parser("models")
-    models.add_argument("--database", type=Path, default=default_database_path())
+    models.add_argument("--database", type=Path, default=database)
     models.add_argument("--json", action="store_true")
     configure = poster_actions.add_parser("configure")
-    configure.add_argument("--database", type=Path, default=default_database_path())
+    configure.add_argument("--database", type=Path, default=database)
     configure.add_argument("--provider", choices=("openai", "openclaw"))
     configure.add_argument("--model")
     configure_mode = configure.add_mutually_exclusive_group(required=True)
@@ -163,7 +178,7 @@ def _parser() -> argparse.ArgumentParser:
     model_test.add_argument("--output", required=True, type=Path)
     benchmark = poster_actions.add_parser("benchmark", help="运行或查看本机中文海报基准")
     benchmark.add_argument("benchmark_action", nargs="?", choices=("status", "review"), default="run")
-    benchmark.add_argument("--database", type=Path, default=default_database_path())
+    benchmark.add_argument("--database", type=Path, default=database)
     benchmark.add_argument("--provider", choices=("openclaw",))
     benchmark.add_argument("--model")
     benchmark.add_argument("--cases", type=int, default=3)
@@ -172,27 +187,27 @@ def _parser() -> argparse.ArgumentParser:
     benchmark_review.add_argument("--reject", action="store_true")
     benchmark.add_argument("--notes", default="")
     latest = poster_actions.add_parser("latest")
-    latest.add_argument("--database", type=Path, default=default_database_path())
+    latest.add_argument("--database", type=Path, default=database)
     history = poster_actions.add_parser("list")
-    history.add_argument("--database", type=Path, default=default_database_path())
+    history.add_argument("--database", type=Path, default=database)
     history.add_argument("--days", type=int, default=90)
     key = poster_actions.add_parser("key")
     key.add_argument("key_action", choices=("set", "status", "delete"))
-    key.add_argument("--database", type=Path, default=default_database_path())
+    key.add_argument("--database", type=Path, default=database)
 
     dashboard = actions.add_parser("dashboard", help="启动本地 Dashboard")
-    dashboard.add_argument("--port", type=int, default=18766)
-    dashboard.add_argument("--database", type=Path, default=default_database_path())
+    dashboard.add_argument("--port", type=int, default=context.dashboard_port)
+    dashboard.add_argument("--database", type=Path, default=database)
     dashboard.add_argument("--open", action="store_true")
 
     doctor = actions.add_parser("doctor", help="诊断雷达运行状态")
-    doctor.add_argument("--database", type=Path, default=default_database_path())
+    doctor.add_argument("--database", type=Path, default=database)
     doctor.add_argument("--json", action="store_true")
 
     site = actions.add_parser("site", help="构建公开只读静态站点")
     site_actions = site.add_subparsers(dest="site_action", required=True)
     site_build = site_actions.add_parser("build", help="导出 GitHub Pages 数据和静态资产")
-    site_build.add_argument("--database", type=Path, default=default_database_path())
+    site_build.add_argument("--database", type=Path, default=database)
     site_build.add_argument("--output", type=Path, required=True)
     site_build.add_argument(
         "--base-url",
@@ -204,22 +219,48 @@ def _parser() -> argparse.ArgumentParser:
         "start",
         help="首次自动采集一次，然后启动本机 Dashboard（uvx 一行体验）",
     )
-    start.add_argument("--port", type=int, default=18766)
-    start.add_argument("--database", type=Path, default=default_database_path())
+    start.add_argument("--port", type=int, default=context.dashboard_port)
+    start.add_argument("--database", type=Path, default=database)
     start.add_argument("--timeout", type=float, default=20)
     start.add_argument("--open", action="store_true")
 
     service = actions.add_parser("service", help="管理 macOS 常驻服务")
     service.add_argument("service_action", choices=("install", "status", "uninstall"))
-    service.add_argument("--port", type=int, default=18766)
+    service.add_argument("--port", type=int, default=context.dashboard_port)
     service.add_argument("--hour", type=int, default=8)
     service.add_argument("--minute", type=int, default=0)
-    service.add_argument("--database", type=Path, default=default_database_path())
+    service.add_argument("--database", type=Path, default=database)
     return parser
 
 
-def _print(payload: object) -> None:
-    print(json.dumps(payload, ensure_ascii=False, indent=2))
+def _print(payload: object, *, output: Path | None = None) -> None:
+    rendered = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    if output is None:
+        sys.stdout.write(rendered)
+    else:
+        output.write_text(rendered, encoding="utf-8")
+
+
+def _list_markdown(records: tuple[dict[str, Any], ...]) -> str:
+    if not records:
+        return "# AI 资源雷达\n\n还没有本地数据，请先运行 `ai-radar refresh`。\n"
+    lines = ["# AI 资源雷达", ""]
+    for record in records:
+        quota = record.get("quota_value")
+        quota_text = "额度浮动" if quota is None else f"{quota:g} {record.get('quota_unit') or ''}".strip()
+        card = "无需信用卡" if record.get("requires_card") == "no" else "信用卡要求待确认"
+        lines.append(
+            f"- [{record.get('priority_tier', 'D')}] {record.get('provider', '')} / "
+            f"{record.get('title', '')} — {quota_text}；{card}"
+        )
+    return "\n".join(lines) + "\n"
+
+
+def _write_text(rendered: str, output: Path | None) -> None:
+    if output is None:
+        sys.stdout.write(rendered)
+    else:
+        output.write_text(rendered, encoding="utf-8")
 
 
 def _schema_failure(error: UnsupportedSchemaError) -> int:
@@ -237,8 +278,9 @@ def _schema_failure(error: UnsupportedSchemaError) -> int:
     return 2
 
 
-def main(argv: list[str] | None = None) -> int:
-    args = _parser().parse_args(argv)
+def main(argv: list[str] | None = None, *, context: CliContext | None = None) -> int:
+    context = context or CliContext()
+    args = _parser(context).parse_args(argv)
     if args.action == "refresh":
         try:
             report = refresh(
@@ -253,7 +295,7 @@ def main(argv: list[str] | None = None) -> int:
         except (ValueError, OperationLockedError) as exc:
             print(str(exc), file=sys.stderr)
             return 1 if isinstance(exc, OperationLockedError) else 2
-        _print(report.to_dict())
+        _print(report.to_dict(), output=args.output)
         return 1 if report.failed_count else 0
     if args.action == "list":
         try:
@@ -274,7 +316,13 @@ def main(argv: list[str] | None = None) -> int:
         except ValueError as exc:
             print(str(exc), file=sys.stderr)
             return 2
-        _print({"schema_version": "2.0", "count": len(records), "resources": records})
+        if args.format == "markdown":
+            _write_text(_list_markdown(records), args.output)
+        else:
+            _print(
+                {"schema_version": "2.0", "count": len(records), "resources": records},
+                output=args.output,
+            )
         return 0
     if args.action == "changes":
         try:
@@ -284,7 +332,10 @@ def main(argv: list[str] | None = None) -> int:
         except ValueError as exc:
             print(str(exc), file=sys.stderr)
             return 2
-        _print({"schema_version": "2.0", "count": len(changes), "changes": changes})
+        _print(
+            {"schema_version": "2.0", "count": len(changes), "changes": changes},
+            output=args.output,
+        )
         return 0
     if args.action == "tips":
         try:
@@ -335,6 +386,7 @@ def main(argv: list[str] | None = None) -> int:
                         args.tip_id,
                         action="approve",
                         scope=args.scope,
+                        project_root=context.project_root,
                     )
                 )
                 return 0
@@ -345,6 +397,7 @@ def main(argv: list[str] | None = None) -> int:
                         args.tip_ids,
                         scope=args.scope,
                         adopt_existing=args.adopt_existing,
+                        project_root=context.project_root,
                     )
                 )
                 return 0
@@ -367,10 +420,22 @@ def main(argv: list[str] | None = None) -> int:
                 _print({"schema_version": "1.0", "batches": batches})
                 return 0
             if args.tips_action == "rollback":
-                _print(rollback_tip_application(args.database, args.application_id))
+                _print(
+                    rollback_tip_application(
+                        args.database,
+                        args.application_id,
+                        project_root=context.project_root,
+                    )
+                )
                 return 0
             if args.tips_action == "rollback-batch":
-                _print(rollback_tip_batch(args.database, args.batch_id))
+                _print(
+                    rollback_tip_batch(
+                        args.database,
+                        args.batch_id,
+                        project_root=context.project_root,
+                    )
+                )
                 return 0
             report = refresh_official_tips(
                 args.database, force=args.force, timeout=args.timeout
@@ -394,7 +459,11 @@ def main(argv: list[str] | None = None) -> int:
                 timeout=args.timeout,
                 force=args.force_refresh,
             )
-            poster = generate_daily_poster(args.database)
+            poster = generate_daily_poster(
+                args.database,
+                poster_root=context.poster_root,
+                provider=args.poster_provider,
+            )
             poster_status = daily_report_status(args.database)
         except UnsupportedSchemaError as exc:
             return _schema_failure(exc)
@@ -408,7 +477,8 @@ def main(argv: list[str] | None = None) -> int:
                 "tips": tips,
                 "poster": poster,
                 "poster_status": poster_status,
-            }
+            },
+            output=args.output,
         )
         # Individual source failures are isolated and recorded in the report;
         # they must not make the scheduled daily job look crashed. A configured
@@ -513,6 +583,7 @@ def main(argv: list[str] | None = None) -> int:
                     payload = run_poster_benchmark(
                         args.database,
                         cases=args.cases,
+                        poster_root=context.poster_root,
                         **model_args,
                     )
             except UnsupportedSchemaError as exc:
@@ -530,6 +601,7 @@ def main(argv: list[str] | None = None) -> int:
                 payload = generate_daily_poster(
                     args.database,
                     force=args.force,
+                    poster_root=context.poster_root,
                     provider=args.provider,
                     model=args.model,
                 )
@@ -538,7 +610,7 @@ def main(argv: list[str] | None = None) -> int:
             except OperationLockedError as exc:
                 print(str(exc), file=sys.stderr)
                 return 1
-            _print(payload)
+            _print(payload, output=args.output)
             return 0 if payload.get("status") == "success" else 1
         if args.poster_action == "latest":
             try:
@@ -557,7 +629,24 @@ def main(argv: list[str] | None = None) -> int:
             return _schema_failure(exc)
         return 0
     if args.action == "doctor":
-        report = diagnose(args.database)
+        report = (
+            context.doctor(args.database)
+            if context.doctor is not None
+            else diagnose(args.database)
+        )
+        if isinstance(report, dict):
+            if args.json:
+                _print(report)
+            else:
+                print(f"AI Resource Radar Doctor: {report.get('overall', 'failed')}")
+                for check in report.get("checks", ()):
+                    print(
+                        f"[{check.get('status', 'failed')}] "
+                        f"{check.get('id', 'unknown')}: {check.get('summary', '')}"
+                    )
+                    if check.get("remediation"):
+                        print(f"  修复：{check['remediation']}")
+            return int(report.get("exit_code", 2))
         if args.json:
             _print(report.to_dict())
         else:
@@ -607,12 +696,22 @@ def main(argv: list[str] | None = None) -> int:
         except (OperationLockedError, ValueError, OSError) as exc:
             print(str(exc), file=sys.stderr)
             return 1 if isinstance(exc, OperationLockedError) else 2
-        return serve(port=args.port, database=args.database, open_browser=args.open)
+        return serve(
+            port=args.port,
+            database=args.database,
+            poster_root=context.poster_root,
+            open_browser=args.open,
+        )
     if args.action == "dashboard":
         if not 1024 <= args.port <= 65535:
             print("invalid_dashboard_port", file=sys.stderr)
             return 2
-        return serve(port=args.port, database=args.database, open_browser=args.open)
+        return serve(
+            port=args.port,
+            database=args.database,
+            poster_root=context.poster_root,
+            open_browser=args.open,
+        )
     service_actions = {"install": install, "status": status, "uninstall": uninstall}
     try:
         result = service_actions[args.service_action](

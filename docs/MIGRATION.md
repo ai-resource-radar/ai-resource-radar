@@ -1,5 +1,18 @@
 # Migrating installed services
 
+## v0.4 to v0.6
+
+v0.6 keeps SQLite schema v7, so opening an existing database performs no data migration. The
+change is architectural: local Dashboard assets, API routing, and CLI dispatch now come from the
+standalone package. Embedding hosts should pin the matching package version and provide only their
+database/poster paths, port, project root, and host diagnostics.
+
+Existing `/ai-resources.html`, `/ai-resources.css`, `/ai-resources.js`, API payloads, error codes,
+database locations, and LaunchAgent labels remain compatible. Nested browser modules are served
+under `/ai-radar-assets/`; custom hosts must pass that prefix through the safe asset resolver.
+Reinstall an existing service after upgrading so its immutable runtime bundle contains the new
+modules and nested browser assets.
+
 ## v0.3 to v0.4
 
 Stop or reinstall the service with the host-specific installer so it can create the normal online

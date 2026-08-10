@@ -12,6 +12,8 @@ class PagesWorkflowTests(unittest.TestCase):
         cls.text = WORKFLOW.read_text(encoding="utf-8")
 
     def test_runs_daily_and_has_manual_force_input(self) -> None:
+        self.assertIn("push:", self.text)
+        self.assertRegex(self.text, r"branches:\s*\n\s*- main")
         self.assertRegex(self.text, r'cron:\s*["\']20 0 \* \* \*["\']')
         self.assertIn("workflow_dispatch:", self.text)
         self.assertIn("force:", self.text)
