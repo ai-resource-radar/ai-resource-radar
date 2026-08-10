@@ -1,10 +1,9 @@
-# v0.4 launch kit (draft only)
+# Historical launch kit (promotion paused)
 
-This file prepares copy for a human to review. It does **not** post to any service, create an
-account, or trigger a release. Replace `{LIVE_URL}`, `{DATA_URL}`, and `{REPO_URL}` with the final
-links only after the Pages workflow has produced a healthy or partial manifest. Do not invent
-counts, savings, uptime, or provider endorsements; if a number is useful, quote the dated public
-manifest.
+This historical draft does **not** post to any service, create an account, or trigger a release.
+Promotion is paused for v0.6.1 while the public experience is synchronized with the local
+Dashboard. Do not use the copy below without a new explicit approval. Never invent counts,
+savings, uptime, or provider endorsements; if a number is useful, quote the dated public manifest.
 
 ## English copy
 
@@ -54,14 +53,13 @@ AI 免费资源雷达是本地优先的免费 Token、GPU 算力、资助和价�
 问题会在发布前停止，旧站保持不变。你可以从 {LIVE_URL} 开始，下载 {DATA_URL}，或运行
 `uvx ai-resource-radar start --open`。接入前请阅读隐私、安全和迁移说明。
 
-## First launch channel
+## First launch channel (inactive)
 
-This is a review prompt, not an automatic publishing instruction. The first v0.4 launch is limited
-to 掘金. V2EX and every other external channel are intentionally skipped.
+No launch channel is currently approved. 掘金, V2EX, and every other external channel are skipped.
 
 | Channel | Suggested angle and constraints |
 | --- | --- |
-| 掘金 | Publish a technical walkthrough: source allow-list → parser → normalized SQLite → public manifest and partial gate. Include the `uvx` command and a small, dated example; label every screenshot as sample data. |
+| None | Promotion remains paused until a later explicit review and approval. |
 
 ## Before any post
 

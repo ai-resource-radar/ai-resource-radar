@@ -1,0 +1,34 @@
+.radar-offer-card {
+  min-width: 0;
+  padding: 20px;
+  color: var(--radar-ink);
+  background: var(--radar-paper);
+  border: 1px solid var(--radar-line);
+  border-radius: var(--radar-radius);
+  box-shadow: var(--radar-shadow);
+}
+.radar-offer-card.is-primary { border-color: #a9d7ba; box-shadow: 0 16px 38px rgb(8 117 71 / 10%); }
+.radar-card-header, .radar-card-provider, .radar-card-actions { display: flex; align-items: center; }
+.radar-card-header { justify-content: space-between; gap: 12px; }
+.radar-card-provider { min-width: 0; gap: 8px; color: var(--radar-muted); font-size: 12px; font-weight: 700; }
+.radar-card-provider-icon { display: grid; flex: 0 0 30px; width: 30px; height: 30px; place-items: center; color: #dff6a1; background: var(--radar-ink); border-radius: 9px; font-size: 10px; }
+.radar-card-tier { min-width: 28px; padding: 4px 8px; color: var(--radar-green-dark); background: var(--radar-green-soft); border-radius: 999px; text-align: center; font-size: 11px; font-weight: 800; }
+.radar-card-benefit { margin-top: 18px; }
+.radar-card-label, .radar-card-fact > span { display: block; color: var(--radar-muted); font-size: 11px; font-weight: 750; letter-spacing: .04em; }
+.radar-card-amount { display: block; margin-top: 4px; font-size: clamp(22px, 3vw, 31px); line-height: 1.12; letter-spacing: -.045em; }
+.radar-card-summary { margin: 7px 0 0; color: var(--radar-muted); font-size: 13px; line-height: 1.6; }
+.radar-card-facts { display: grid; gap: 9px; margin-top: 17px; padding-top: 15px; border-top: 1px solid var(--radar-line); }
+.radar-card-fact { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 10px; }
+.radar-card-fact p { margin: 0; font-size: 12px; line-height: 1.55; }
+.radar-card-actions { flex-wrap: wrap; gap: 8px; margin-top: 17px; }
+.radar-card-actions a, .radar-card-actions button { min-height: 44px; padding: 10px 13px; border-radius: 10px; font-size: 12px; font-weight: 750; text-decoration: none; }
+.radar-card-primary { color: #fff; background: var(--radar-green); border: 1px solid var(--radar-green); }
+.radar-card-primary:hover { background: var(--radar-green-dark); }
+.radar-card-secondary { color: var(--radar-green-dark); background: var(--radar-green-soft); border: 1px solid #c4e4cf; }
+.radar-card-actions a:focus-visible, .radar-card-actions button:focus-visible { outline: 3px solid var(--radar-focus); outline-offset: 2px; }
+
+@media (max-width: 430px) {
+  .radar-offer-card { padding: 16px; }
+  .radar-card-fact { grid-template-columns: 66px minmax(0, 1fr); }
+  .radar-card-actions > * { flex: 1 1 auto; text-align: center; }
+}

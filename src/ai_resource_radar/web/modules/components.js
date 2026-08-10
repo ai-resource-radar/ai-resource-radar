@@ -1,5 +1,7 @@
 /* DOM components stay text-only so source data can never become markup. */
 import { createDialogController } from "/ai-radar-assets/ui-modules.js";
+import { createOfferCard } from "/ai-radar-shared/cards.js";
+import { element, safeLink } from "/ai-radar-shared/dom.js";
 import {
   actionQuota,
   benefitSummary,
@@ -11,28 +13,7 @@ import {
   usageSteps,
 } from "/ai-radar-assets/modules/formatters.js";
 
-export function element(tag, className, text) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
-}
-
-export function safeLink(label, url, className) {
-  try {
-    const target = new URL(url);
-    if (!["http:", "https:"].includes(target.protocol)) return null;
-    const link = element("a", className, label);
-    link.href = target.href;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    link.referrerPolicy = "no-referrer";
-    link.addEventListener("click", (event) => event.stopPropagation());
-    return link;
-  } catch {
-    return null;
-  }
-}
+export { element, safeLink };
 
 export function metric(label, value, note) {
   const card = element("article", "radar-metric");
@@ -86,42 +67,12 @@ export function activateCard(card, action) {
 }
 
 export function featureCard(resource, primary, ctx) {
-  const card = element("article", `feature-card${primary ? " primary" : ""}`);
-  const identity = element("div", "feature-identity");
-  const provider = element("div", "feature-provider");
-  provider.append(
-    element("span", "feature-provider-icon", providerInitials(resource.provider)),
-    element("span", "", `${resource.provider} · ${kindLabel(resource.kind)}`),
-  );
-  const tier = element("span", "feature-tier", resource.priority_tier);
-  tier.dataset.tier = resource.priority_tier;
-  identity.append(provider, tier);
-  const badges = element("div", "provider-badges");
-  cardBadges(resource).slice(0, 3).forEach(([text, className]) => badges.append(element("span", className, text)));
-  const benefit = element("div", "feature-benefit");
-  benefit.append(
-    element("span", "feature-label", "送什么"),
-    element("div", "feature-amount", actionQuota(resource)),
-    element("div", "feature-description", benefitSummary(resource)),
-  );
-  card.append(
-    identity,
-    benefit,
-    badges,
-  );
-  const steps = usageSteps(resource);
-  const threshold = element("p", "feature-threshold", steps.length
-    ? `第一步：${steps[0].replace(/[。；]$/, "")}`
-    : "打开详情查看领取条件与官方证据");
-  const actions = element("div", "feature-actions");
-  const claim = safeLink("去领取 ↗", guide(resource).action_url || resource.homepage_url, "feature-claim");
-  const details = element("button", "feature-details", "查看步骤");
-  details.type = "button";
-  details.addEventListener("click", () => ctx.showOffer(resource, details));
-  if (claim) actions.append(claim);
-  actions.append(details);
-  card.append(threshold, actions);
-  return card;
+  return createOfferCard(resource, {
+    locale: "zh-CN",
+    primary,
+    className: "feature-card",
+    onDetails: (offer, trigger) => ctx.showOffer(offer, trigger),
+  });
 }
 
 function appendPolicyGuide(resource, detailRoot, options = {}) {

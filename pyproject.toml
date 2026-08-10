@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-resource-radar"
-version = "0.6.0"
+version = "0.6.1"
 description = "Daily-verified free AI tokens, GPU compute, grants, and prices with a local-first dashboard"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -36,6 +36,8 @@ where = ["src"]
 [tool.setuptools.package-data]
 ai_resource_radar = [
   "native/*.swift",
+  "frontend_shared/*.css",
+  "frontend_shared/*.js",
   "web/*.html",
   "web/*.css",
   "web/*.js",

@@ -54,8 +54,15 @@ class InterfaceContractTests(unittest.TestCase):
         asset = resolve_dashboard_asset("/ai-resources.html")
         self.assertIsNotNone(asset)
         self.assertEqual(asset[0].name, "index.html")
+        shared = resolve_dashboard_asset("/ai-radar-shared/cards.js")
+        self.assertIsNotNone(shared)
+        self.assertEqual(shared[0].name, "cards.js")
+        self.assertEqual(shared[1], "text/javascript; charset=utf-8")
         self.assertIsNone(
             resolve_dashboard_asset("/ai-radar-assets/../../pyproject.toml")
+        )
+        self.assertIsNone(
+            resolve_dashboard_asset("/ai-radar-shared/../../pyproject.toml")
         )
 
     def test_cli_context_overrides_database_and_project_root(self) -> None:

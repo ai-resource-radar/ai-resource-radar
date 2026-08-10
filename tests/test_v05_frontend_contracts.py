@@ -59,24 +59,38 @@ class FrontendContractTests(unittest.TestCase):
         styles = "\n".join((LOCAL / "styles" / name).read_text(encoding="utf-8") for name in ("components.css", "views.css"))
         for selector in (".feature-card:focus-visible", ".tip-card:focus-visible"):
             self.assertIn(selector, styles)
-        for selector in (".feature-claim", ".feature-details", ".provider-claim", ".provider-details"):
+        for selector in (".provider-claim", ".provider-details"):
             self.assertIn(selector, styles)
         self.assertIn("var(--radar-focus-ring)", styles)
+        shared_cards = (ROOT / "frontend_shared/cards.css").read_text(encoding="utf-8")
+        for selector in (".radar-offer-card", ".radar-card-fact", ".radar-card-primary"):
+            self.assertIn(selector, shared_cards)
+        self.assertNotIn(".feature-amount", (LOCAL / "styles/components.css").read_text(encoding="utf-8"))
 
     def test_bilingual_public_site_keeps_static_module_and_shared_tokens(self) -> None:
         html = (PUBLIC / "index.html").read_text(encoding="utf-8")
         javascript = (PUBLIC / "app.js").read_text(encoding="utf-8")
         styles = (PUBLIC / "styles.css").read_text(encoding="utf-8")
+        shared = ROOT / "frontend_shared"
+        local_components = (LOCAL / "modules/components.js").read_text(encoding="utf-8")
+        local_tokens = (LOCAL / "styles/tokens.css").read_text(encoding="utf-8")
         self.assertIn('type="module"', html)
         self.assertIn('class="skip-link"', html)
         self.assertIn('Content-Security-Policy', html)
-        self.assertIn('role="tablist"', html)
-        self.assertIn('role="tabpanel"', html)
-        self.assertIn('from "./ui-modules.js"', javascript)
-        self.assertIn('"ArrowRight"', javascript)
+        self.assertIn('data-group="free"', html)
+        self.assertIn('data-group="prices"', html)
+        self.assertNotIn('data-view="changes"', html)
+        self.assertIn('id="previous-page"', html)
+        self.assertIn('id="page-label"', html)
+        self.assertIn('id="next-page"', html)
+        self.assertIn('from "./shared/cards.js"', javascript)
+        self.assertIn('createOfferCard', javascript)
         self.assertIn('document.title = state.locale', javascript)
-        self.assertIn('@import url("./radar-tokens.css")', styles)
-        self.assertTrue((PUBLIC / "radar-tokens.css").exists())
+        self.assertIn('@import url("./shared/radar-tokens.css")', styles)
+        self.assertIn('@import url("/ai-radar-shared/radar-tokens.css")', local_tokens)
+        self.assertIn('from "/ai-radar-shared/cards.js"', local_components)
+        for name in ("cards.js", "cards.css", "dom.js", "formatters.js", "radar-tokens.css"):
+            self.assertTrue((shared / name).exists())
         self.assertNotIn("innerHTML", javascript)
 
 

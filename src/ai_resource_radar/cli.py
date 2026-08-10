@@ -214,6 +214,17 @@ def _parser(context: CliContext | None = None) -> argparse.ArgumentParser:
         default="https://ai-resource-radar.github.io/ai-resource-radar/",
         help="站点公开基址（必须是 HTTP(S) URL）",
     )
+    site_build.add_argument(
+        "--source-revision",
+        default=None,
+        help="生成该公开快照的源码提交标识",
+    )
+    site_build.add_argument(
+        "--refresh-report",
+        type=Path,
+        default=None,
+        help="本轮 refresh JSON 报告；提供后启用公开数据新鲜度门槛",
+    )
 
     start = actions.add_parser(
         "start",
@@ -665,6 +676,8 @@ def main(argv: list[str] | None = None, *, context: CliContext | None = None) ->
                 args.database,
                 args.output,
                 base_url=args.base_url,
+                source_revision=args.source_revision,
+                refresh_report=args.refresh_report,
             )
         except UnsupportedSchemaError as exc:
             return _schema_failure(exc)

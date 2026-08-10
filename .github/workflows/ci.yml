@@ -22,7 +22,7 @@ jobs:
       - run: python -m unittest discover -s tests -p 'test_*.py'
       - run: python -m compileall -q src
       - name: Check all browser modules
-        run: find src/ai_resource_radar/web src/ai_resource_radar/public_web -name '*.js' -type f -print0 | xargs -0 -n1 node --check
+        run: find src/ai_resource_radar/web src/ai_resource_radar/public_web src/ai_resource_radar/frontend_shared -name '*.js' -type f -print0 | xargs -0 -n1 node --check
 
   macos:
     runs-on: macos-latest
@@ -84,6 +84,9 @@ jobs:
               "styles/responsive.css",
           ):
               assert dashboard.joinpath(name).is_file(), name
+          shared = files("ai_resource_radar").joinpath("frontend_shared")
+          for name in ("cards.js", "cards.css", "dom.js", "formatters.js", "radar-tokens.css"):
+              assert shared.joinpath(name).is_file(), name
           PY
       - name: Create checksums
         run: |

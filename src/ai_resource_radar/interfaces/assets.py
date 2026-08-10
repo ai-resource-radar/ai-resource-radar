@@ -7,6 +7,7 @@ from pathlib import Path
 
 
 _ASSET_ROOT = Path(__file__).resolve().parents[1] / "web"
+_SHARED_ASSET_ROOT = Path(__file__).resolve().parents[1] / "frontend_shared"
 _LEGACY = {
     "/": "index.html",
     "/index.html": "index.html",
@@ -20,14 +21,18 @@ _LEGACY = {
 
 
 def resolve_dashboard_asset(path: str) -> tuple[Path, str] | None:
+    root = _ASSET_ROOT
     relative = _LEGACY.get(path)
     if relative is None and path.startswith("/ai-radar-assets/"):
         relative = path.removeprefix("/ai-radar-assets/")
+    if relative is None and path.startswith("/ai-radar-shared/"):
+        root = _SHARED_ASSET_ROOT
+        relative = path.removeprefix("/ai-radar-shared/")
     if relative is None:
         return None
-    candidate = (_ASSET_ROOT / relative).resolve()
+    candidate = (root / relative).resolve()
     try:
-        candidate.relative_to(_ASSET_ROOT.resolve())
+        candidate.relative_to(root.resolve())
     except ValueError:
         return None
     if not candidate.is_file():

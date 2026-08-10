@@ -7,8 +7,9 @@ The public site is a static, read-only view of the latest **AI Resource Radar** 
 - Builder: `ai-radar site build --database PATH --output DIR --base-url URL`
 
 The repository's Pages workflow runs the deterministic, keyless refresh at 00:20 UTC each day and
-can also be started manually. It uses a CI-only SQLite cache to carry trusted values between runs;
-the cache is not a user database and is never published.
+after every push to `main`. Both paths force all 23 registered sources even when a CI-only SQLite
+cache is restored. Manual runs force by default and expose an explicit diagnostic opt-out. The
+cache carries last trusted values between runs; it is not a user database and is never published.
 
 ## Public schema
 
@@ -16,8 +17,13 @@ the cache is not a user database and is never published.
 
 ```json
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "dataset": "ai-resource-radar-public",
+  "package_version": "0.6.1",
+  "source_revision": "0123456789abcdef",
+  "refresh_mode": "forced",
+  "refresh_started_at": "2026-01-01T00:24:00Z",
+  "data_age_seconds": 120,
   "status": "healthy",
   "generated_at": "2026-01-01T00:27:00Z",
   "radar_refreshed_at": "2026-01-01T00:25:00Z",
@@ -32,10 +38,13 @@ the cache is not a user database and is never published.
 }
 ```
 
-`status` is `healthy` when all due sources completed, or `partial` when one or more sources
-failed but the remaining trusted data is safe to show. A severe or untrustworthy build is not
-publishable. `source_health` records bounded source counts; `data/source-health.json` contains the
-per-source status and timestamp. Neither contains
+`status` is `healthy` when all sources are fresh, or `partial` when one or more sources failed or
+need verification but the remaining trusted data is safe to show. A severe or untrustworthy build
+is not publishable. For CI-bound builds, `source_revision` identifies the exact source commit,
+`refresh_mode` records whether cadence was bypassed, and `data_age_seconds` must not exceed 1,800.
+All 23 registered source IDs must occur in the refresh report; `stale` and `never` are rejected.
+`source_health` records bounded source counts; `data/source-health.json` contains the per-source
+status and timestamp. Neither contains
 request headers, response bodies, cookies, or account identifiers. `files` and `file_hashes` let a client
 discover and verify the generated JSON without trusting page markup.
 
@@ -72,17 +81,18 @@ money.
 
 ## Pages publication and failure policy
 
-The workflow installs the package, restores only the CI SQLite snapshot, refreshes allow-listed
-sources, and runs `site build` with the repository Pages base URL. It verifies a non-empty
-`index.html` and `data/manifest.json`, then accepts only `healthy` or `partial` manifests. The
-artifact is uploaded and deployed in a separate Pages job, so a build or gate failure cannot
-replace the last deployed site.
+The workflow installs the package, restores only the CI SQLite snapshot, force-refreshes every
+allow-listed source, and runs `site build` with both the repository revision and refresh report. It
+verifies a non-empty `index.html` and `data/manifest.json`, an exact 23-source attempt set, data age
+of at most 30 minutes, no `stale`/`never` source, and a matching Git revision. It then accepts only
+`healthy` or `partial` manifests. The artifact is uploaded and deployed in a separate Pages job, so
+a build or gate failure cannot replace the last deployed site.
 
 One source failure is represented as `partial`; the parser keeps that source's last trusted value
 and records its health while other sources continue. A schema error, missing required output, or
-severe data-integrity threshold fails the build. A manual `force` run bypasses source cadence but
-does not bypass parser validation or the publication gate. There are no credentials or AI calls in
-this path.
+severe data-integrity threshold fails the build. Turning off force for a manual diagnostic never
+bypasses parser validation or the publication gate. There are no credentials or AI calls in this
+path.
 
 For verifiable snapshots, download the files listed in `manifest.files` and verify their
 `manifest.file_hashes` entries. Do not mirror the SQLite cache or infer a provider policy from a

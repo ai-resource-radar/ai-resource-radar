@@ -1,6 +1,6 @@
 """Stable public facade for the deterministic AI Resource Radar core."""
 
-__version__ = "0.6.0"
+__version__ = "0.6.1"
 
 from ai_resource_radar.interfaces.http import ApiResponse, RadarDashboardPort
 

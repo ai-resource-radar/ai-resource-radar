@@ -52,6 +52,14 @@ class DashboardTests(unittest.TestCase):
         self.assertIn("免费资源雷达", body.decode())
         self.assertIn("default-src 'self'", headers["Content-Security-Policy"])
 
+        status, headers, body = self.request("GET", "/ai-radar-shared/cards.js")
+        self.assertEqual(status, 200)
+        self.assertIn("javascript", headers["Content-Type"])
+        self.assertIn("createOfferCard", body.decode())
+
+        status, _, _ = self.request("GET", "/ai-radar-shared/../../pyproject.toml")
+        self.assertEqual(status, 404)
+
         status, _, body = self.request("GET", "/api/ai-resources/summary")
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(body)["counts"]["active"], 0)

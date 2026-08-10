@@ -32,7 +32,7 @@ from ai_resource_radar.store import (
 
 
 MAX_SOURCE_BYTES = 16 * 1024 * 1024
-USER_AGENT = "AIResourceRadar/0.6"
+USER_AGENT = "AIResourceRadar/0.6.1"
 
 
 @dataclass(frozen=True)

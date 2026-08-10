@@ -18,8 +18,10 @@ import tempfile
 from typing import Any, Iterable
 from urllib.parse import urlparse
 
+from ai_resource_radar import __version__
 from ai_resource_radar.public_locales import presentation_for
 from ai_resource_radar.pricing import list_gpu_prices, list_token_prices
+from ai_resource_radar.sources import SOURCES
 from ai_resource_radar.store import (
     UnsupportedSchemaError,
     list_changes,
@@ -28,7 +30,7 @@ from ai_resource_radar.store import (
 )
 
 
-PUBLIC_SCHEMA_VERSION = "1.0"
+PUBLIC_SCHEMA_VERSION = "1.1"
 DATASET_ID = "ai-resource-radar-public"
 MAX_PAGE = 500
 FREE_OFFER_TYPES = {"recurring_free", "variable_free", "grant"}
@@ -42,6 +44,30 @@ _SECRET_KEY = re.compile(
 
 class PublicSiteError(RuntimeError):
     """Raised when a public snapshot must not replace the previous snapshot."""
+
+
+def _time(value: Any) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else parsed.astimezone()
+
+
+def _load_refresh_report(value: Path | dict[str, Any] | None) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        return value
+    try:
+        payload = json.loads(value.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise PublicSiteError("publish_gate_invalid_refresh_report") from exc
+    if not isinstance(payload, dict):
+        raise PublicSiteError("publish_gate_invalid_refresh_report")
+    return payload
 
 
 def _jsonable(value: Any, *, depth: int = 0) -> Any:
@@ -273,6 +299,8 @@ def build_public_site(
     *,
     base_url: str = "https://ai-resource-radar.github.io/ai-resource-radar/",
     now: datetime | None = None,
+    source_revision: str | None = None,
+    refresh_report: Path | dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Atomically build a public static snapshot, preserving an old output on failure."""
 
@@ -283,6 +311,7 @@ def build_public_site(
         raise ValueError("invalid_public_base_url")
     current = (now or datetime.now().astimezone()).astimezone()
     generated_at = current.isoformat(timespec="seconds")
+    report = _load_refresh_report(refresh_report)
 
     try:
         raw_resources = [
@@ -325,10 +354,58 @@ def build_public_site(
     }
     degraded = any(item.get("status") != "fresh" for item in statuses)
     status = "partial" if degraded else "healthy"
+    last_refresh = _time(summary.get("last_refresh_at"))
+    data_age_seconds = (
+        max(0, int((current - last_refresh.astimezone(current.tzinfo)).total_seconds()))
+        if last_refresh is not None
+        else None
+    )
+    refresh_started_at = report.get("generated_at") if report else None
+    refresh_mode = str(report.get("refresh_mode") or "cadence") if report else "cadence"
+    if report is not None:
+        if refresh_mode not in {"forced", "cadence"} or _time(refresh_started_at) is None:
+            raise PublicSiteError("publish_gate_invalid_refresh_report")
+        report_sources = report.get("sources")
+        if not isinstance(report_sources, list):
+            raise PublicSiteError("publish_gate_invalid_refresh_report")
+        expected_ids = {source.id for source in SOURCES}
+        attempted_ids = {
+            str(item.get("source_id"))
+            for item in report_sources
+            if isinstance(item, dict) and item.get("source_id")
+        }
+        if attempted_ids != expected_ids or len(report_sources) != len(expected_ids):
+            raise PublicSiteError("publish_gate_incomplete_source_attempt")
+        if refresh_mode == "forced" and any(
+            isinstance(item, dict) and item.get("status") == "skipped_not_due"
+            for item in report_sources
+        ):
+            raise PublicSiteError("publish_gate_forced_refresh_skipped")
+        if source_summary.get("total") != len(SOURCES):
+            raise PublicSiteError("publish_gate_source_count_mismatch")
+        attempt_times = [
+            parsed
+            for item in statuses
+            for parsed in (_time(item.get("last_attempt_at")),)
+            if parsed is not None
+        ]
+        if len(attempt_times) != len(SOURCES):
+            raise PublicSiteError("publish_gate_incomplete_source_attempt")
+        oldest_attempt = min(item.astimezone(current.tzinfo) for item in attempt_times)
+        data_age_seconds = max(0, int((current - oldest_attempt).total_seconds()))
+        if data_age_seconds > 30 * 60:
+            raise PublicSiteError("publish_gate_data_too_old")
+        if int(source_summary.get("stale") or 0) or int(source_summary.get("never") or 0):
+            raise PublicSiteError("publish_gate_stale_sources")
     data = {
         "manifest": {
             "schema_version": PUBLIC_SCHEMA_VERSION,
             "dataset": DATASET_ID,
+            "package_version": __version__,
+            "source_revision": (source_revision or "local")[:64],
+            "refresh_mode": refresh_mode,
+            "refresh_started_at": refresh_started_at,
+            "data_age_seconds": data_age_seconds,
             "status": status,
             "publishable": True,
             "generated_at": generated_at,
@@ -392,6 +469,10 @@ def build_public_site(
         if not public_web.is_dir():
             raise PublicSiteError("public_assets_missing")
         shutil.copytree(public_web, temp, dirs_exist_ok=True)
+        shared_web = Path(__file__).with_name("frontend_shared")
+        if not shared_web.is_dir():
+            raise PublicSiteError("public_shared_assets_missing")
+        shutil.copytree(shared_web, temp / "shared")
         canonical = base_url.rstrip("/") + "/"
         for asset in (*temp.glob("*.html"), *temp.glob("*.txt"), *temp.glob("*.xml")):
             content = asset.read_text(encoding="utf-8")

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import csv
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 from pathlib import Path
@@ -10,6 +10,7 @@ import unittest
 from unittest.mock import patch
 
 from ai_resource_radar.public_site import PublicSiteError, _page_prices, build_public_site
+from ai_resource_radar.sources import SOURCES
 
 
 NOW = datetime(2026, 8, 10, 8, 20, tzinfo=timezone.utc)
@@ -78,19 +79,31 @@ def gpu_price() -> dict:
     }
 
 
-def summary(status: str = "fresh") -> dict:
+def summary(status: str = "fresh", *, source_count: int = 1, refreshed_at: datetime = NOW) -> dict:
+    source_items = [
+        {
+            "source_id": (SOURCES[index].id if source_count == len(SOURCES) else f"source-{index}"),
+            "name": (SOURCES[index].name if source_count == len(SOURCES) else f"Source {index}"),
+            "authority": "official_page",
+            "cadence_hours": 24,
+            "status": status,
+            "last_attempt_at": refreshed_at.isoformat(),
+            "last_success_at": refreshed_at.isoformat(),
+        }
+        for index in range(source_count)
+    ]
     return {
         "counts": {"active": 4},
-        "last_refresh_at": NOW.isoformat(),
+        "last_refresh_at": refreshed_at.isoformat(),
         "sources": {
-            "total": 1,
-            "fresh": int(status == "fresh"),
+            "total": source_count,
+            "fresh": source_count if status == "fresh" else 0,
             "overdue": 0,
             "stale": 0,
             "verification_pending": 0,
-            "failed": int(status == "failed"),
+            "failed": source_count if status == "failed" else 0,
             "never": 0,
-            "items": [{"source_id": "source", "name": "Source", "authority": "official_page", "cadence_hours": 24, "status": status, "last_success_at": NOW.isoformat()}],
+            "items": source_items,
         },
         "notifications": {"unread": 99},
         "storage": {"database_bytes": 999, "local_path": "/Users/private"},
@@ -98,16 +111,43 @@ def summary(status: str = "fresh") -> dict:
 
 
 class PublicSiteTests(unittest.TestCase):
-    def _build(self, root: Path, *, source_status: str = "fresh") -> dict:
+    def _build(
+        self,
+        root: Path,
+        *,
+        source_status: str = "fresh",
+        source_count: int = 1,
+        refreshed_at: datetime = NOW,
+        refresh_report: dict | None = None,
+        source_revision: str | None = None,
+    ) -> dict:
         database = root / "radar.sqlite3"
         database.touch()
         resources = {"token": [offer("token", "token:free")], "gpu": [offer("gpu", "gpu:free")], "grant": [offer("grant", "grant:one")]}
         with patch("ai_resource_radar.public_site._page_offers", side_effect=lambda _p, *, kind, include_pricing: resources[kind]), patch(
             "ai_resource_radar.public_site._page_prices", side_effect=lambda _p, *, kind: [token_price()] if kind == "token" else [gpu_price()]
         ), patch("ai_resource_radar.public_site.list_changes", return_value=()), patch(
-            "ai_resource_radar.public_site.radar_summary", return_value=summary(source_status)
+            "ai_resource_radar.public_site.radar_summary",
+            return_value=summary(source_status, source_count=source_count, refreshed_at=refreshed_at),
         ):
-            return build_public_site(database, root / "site", now=NOW)
+            return build_public_site(
+                database,
+                root / "site",
+                now=NOW,
+                refresh_report=refresh_report,
+                source_revision=source_revision,
+            )
+
+    @staticmethod
+    def _refresh_report(*, status: str = "success", mode: str = "forced") -> dict:
+        return {
+            "generated_at": NOW.isoformat(),
+            "refresh_mode": mode,
+            "sources": [
+                {"source_id": source.id, "status": status}
+                for source in SOURCES
+            ],
+        }
 
     def test_exports_json_csv_hashes_and_excludes_private_state(self) -> None:
         with TemporaryDirectory() as temp:
@@ -119,8 +159,12 @@ class PublicSiteTests(unittest.TestCase):
             with (site / "data/resources.csv").open(newline="", encoding="utf-8") as handle:
                 csv_rows = list(csv.DictReader(handle))
             public_text = "\n".join(path.read_text(encoding="utf-8") for path in (site / "data").rglob("*.json"))
-            self.assertEqual(manifest["schema_version"], "1.0")
+            self.assertEqual(manifest["schema_version"], "1.1")
             self.assertEqual(manifest["dataset"], "ai-resource-radar-public")
+            self.assertEqual(manifest["package_version"], "0.6.1")
+            self.assertEqual(manifest["source_revision"], "local")
+            self.assertEqual(manifest["refresh_mode"], "cadence")
+            self.assertEqual(manifest["data_age_seconds"], 0)
             self.assertEqual(manifest["status"], "healthy")
             self.assertEqual(len(resources["items"]), len(csv_rows))
             self.assertTrue((site / "data/source-health.json").exists())
@@ -128,6 +172,8 @@ class PublicSiteTests(unittest.TestCase):
             self.assertNotIn("/Users/private", public_text)
             self.assertNotIn("notifications", public_summary["radar"])
             self.assertNotIn("storage", public_summary["radar"])
+            for name in ("cards.js", "cards.css", "dom.js", "formatters.js", "radar-tokens.css"):
+                self.assertTrue((site / "shared" / name).is_file())
             for relative, expected in manifest["file_hashes"].items():
                 self.assertEqual(hashlib.sha256((site / relative).read_bytes()).hexdigest(), expected)
 
@@ -144,6 +190,85 @@ class PublicSiteTests(unittest.TestCase):
     def test_source_failure_publishes_partial_snapshot(self) -> None:
         with TemporaryDirectory() as temp:
             manifest = self._build(Path(temp), source_status="failed")
+        self.assertEqual(manifest["status"], "partial")
+
+    def test_refresh_report_binds_revision_and_all_registered_sources(self) -> None:
+        with TemporaryDirectory() as temp:
+            manifest = self._build(
+                Path(temp),
+                source_count=len(SOURCES),
+                refresh_report=self._refresh_report(),
+                source_revision="abc123",
+            )
+        self.assertEqual(manifest["source_revision"], "abc123")
+        self.assertEqual(manifest["refresh_mode"], "forced")
+        self.assertEqual(manifest["refresh_started_at"], NOW.isoformat())
+        self.assertEqual(manifest["source_health"]["total"], 23)
+        self.assertEqual(manifest["data_age_seconds"], 0)
+
+    def test_refresh_report_rejects_missing_source_and_preserves_old_site(self) -> None:
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            output = root / "site"
+            output.mkdir()
+            (output / "sentinel").write_text("old", encoding="utf-8")
+            report = self._refresh_report()
+            report["sources"].pop()
+            with self.assertRaisesRegex(PublicSiteError, "incomplete_source_attempt"):
+                self._build(
+                    root,
+                    source_count=len(SOURCES),
+                    refresh_report=report,
+                )
+            self.assertEqual((output / "sentinel").read_text(encoding="utf-8"), "old")
+
+    def test_forced_report_cannot_skip_and_data_must_be_fresh(self) -> None:
+        skipped = self._refresh_report(status="skipped_not_due")
+        with TemporaryDirectory() as temp:
+            with self.assertRaisesRegex(PublicSiteError, "forced_refresh_skipped"):
+                self._build(
+                    Path(temp),
+                    source_count=len(SOURCES),
+                    refresh_report=skipped,
+                )
+
+    def test_refresh_report_requires_known_mode_and_exact_source_rows(self) -> None:
+        invalid_mode = self._refresh_report(mode="unexpected")
+        with TemporaryDirectory() as temp:
+            with self.assertRaisesRegex(PublicSiteError, "invalid_refresh_report"):
+                self._build(
+                    Path(temp),
+                    source_count=len(SOURCES),
+                    refresh_report=invalid_mode,
+                )
+        duplicate = self._refresh_report()
+        duplicate["sources"].append(dict(duplicate["sources"][0]))
+        with TemporaryDirectory() as temp:
+            with self.assertRaisesRegex(PublicSiteError, "incomplete_source_attempt"):
+                self._build(
+                    Path(temp),
+                    source_count=len(SOURCES),
+                    refresh_report=duplicate,
+                )
+        with TemporaryDirectory() as temp:
+            with self.assertRaisesRegex(PublicSiteError, "data_too_old"):
+                self._build(
+                    Path(temp),
+                    source_count=len(SOURCES),
+                    refreshed_at=NOW - timedelta(minutes=31),
+                    refresh_report=self._refresh_report(),
+                )
+
+    def test_single_source_failure_can_publish_partial_when_all_attempted(self) -> None:
+        report = self._refresh_report()
+        report["sources"][0]["status"] = "failed"
+        with TemporaryDirectory() as temp:
+            manifest = self._build(
+                Path(temp),
+                source_status="failed",
+                source_count=len(SOURCES),
+                refresh_report=report,
+            )
         self.assertEqual(manifest["status"], "partial")
 
     def test_price_pagination_reaches_total(self) -> None:

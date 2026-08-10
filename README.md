@@ -40,6 +40,8 @@ uvx ai-resource-radar start --open
 For the hosted snapshot, use [Live Radar](https://ai-resource-radar.github.io/ai-resource-radar/) or fetch
 the documented [public data manifest](https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json).
 The public site is an aggregate view; always follow an official source before relying on an offer.
+Its v0.6.1 snapshot uses the same resource cards and formatting as the local Dashboard while
+remaining static and read-only; Pages binds each build to a fresh 23-source refresh and Git commit.
 
 ## What you get
 

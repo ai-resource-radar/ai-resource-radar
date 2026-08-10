@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.6.1 — 2026-08-10
+
+- Use one shared dependency-free design layer for the local Dashboard and public site, including
+  semantic tokens, safe links, formatters, and the offer card that explains what you get, the
+  entry requirements, the first claim step, and official evidence.
+- Simplify the public site to two primary destinations: Free Resources and Price Rankings. Keep
+  important changes on the recommended overview only and replace progressive loading with explicit
+  previous/page/next pagination.
+- Bind every Pages snapshot to package version, source revision, refresh mode, refresh start time,
+  and data age in public manifest schema 1.1 while keeping existing JSON/CSV URLs compatible.
+- Force all 23 allow-listed sources on `main` pushes and scheduled Pages builds. Reject snapshots
+  older than 30 minutes or with missing, stale, or never-attempted sources; isolated source failures
+  may still publish a clearly marked partial snapshot.
+
 ## 0.6.0 — 2026-08-10
 
 - Redesign the local Dashboard around four clear destinations: Free Resources, Price Rankings,

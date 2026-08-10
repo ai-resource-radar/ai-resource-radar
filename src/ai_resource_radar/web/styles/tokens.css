@@ -1,24 +1,19 @@
 /* Shared visual and semantic tokens. */
-@import url("/ai-radar-assets/radar-tokens.css");
+@import url("/ai-radar-shared/radar-tokens.css");
 
 :root {
   color-scheme: light;
-  --ink: #121713;
-  --muted: #68706b;
-  --line: #dde1dc;
-  --paper: #ffffff;
-  --canvas: #f4f5f2;
-  --green: #087547;
-  --green-soft: #e9f7ef;
-  --lime: #55ef91;
-  --amber: #8a4b08;
-  --amber-soft: #fff4dc;
-  --blue: #1d4ed8;
-  --blue-soft: #edf3ff;
-  --shadow: 0 12px 34px rgba(24, 31, 26, .06);
-  --radar-focus: #2563eb;
-  --radar-focus-ring: 0 0 0 3px rgb(37 99 235 / 24%);
-  --radar-surface-raised: #ffffff;
-  --radar-text-muted: #68736c;
-  --radar-border: #dfe5df;
+  --ink: var(--radar-ink);
+  --muted: var(--radar-muted);
+  --line: var(--radar-line);
+  --paper: var(--radar-paper);
+  --canvas: var(--radar-canvas);
+  --green: var(--radar-green);
+  --green-soft: var(--radar-green-soft);
+  --lime: var(--radar-lime);
+  --amber: var(--radar-amber);
+  --amber-soft: var(--radar-amber-soft);
+  --blue: var(--radar-blue);
+  --blue-soft: var(--radar-blue-soft);
+  --shadow: var(--radar-shadow);
 }

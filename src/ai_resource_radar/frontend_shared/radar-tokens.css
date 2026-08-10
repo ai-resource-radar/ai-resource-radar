@@ -1,0 +1,44 @@
+/* Shared semantic tokens for the local Dashboard and the public snapshot. */
+:root {
+  color-scheme: light;
+  --radar-ink: #121713;
+  --radar-muted: #68706b;
+  --radar-line: #dde1dc;
+  --radar-paper: #ffffff;
+  --radar-canvas: #f4f5f2;
+  --radar-green: #087547;
+  --radar-green-dark: #075737;
+  --radar-green-soft: #e9f7ef;
+  --radar-lime: #55ef91;
+  --radar-amber: #8a4b08;
+  --radar-amber-soft: #fff4dc;
+  --radar-blue: #1d4ed8;
+  --radar-blue-soft: #edf3ff;
+  --radar-red: #a43b30;
+  --radar-red-soft: #fcece9;
+  --radar-shadow: 0 12px 34px rgb(24 31 26 / 6%);
+  --radar-focus: #2563eb;
+  --radar-focus-ring: 0 0 0 3px rgb(37 99 235 / 24%);
+  --radar-surface-raised: #ffffff;
+  --radar-text-muted: #68736c;
+  --radar-border: #dfe5df;
+  --radar-radius-sm: 12px;
+  --radar-radius: 16px;
+  --radar-space-1: 4px;
+  --radar-space-2: 8px;
+  --radar-space-3: 12px;
+  --radar-space-4: 16px;
+  --radar-space-6: 24px;
+  --radar-space-8: 32px;
+  --radar-space-12: 48px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { scroll-behavior: auto; }
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

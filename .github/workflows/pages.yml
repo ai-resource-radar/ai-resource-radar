@@ -12,7 +12,7 @@ on:
       force:
         description: "Ignore source cadence and fetch every allow-listed source"
         required: false
-        default: false
+        default: true
         type: boolean
 
 # The deploy action needs Pages write access and an OIDC token.  No user key or
@@ -57,7 +57,7 @@ jobs:
         id: refresh
         env:
           RADAR_DB: .ci-cache/radar.sqlite3
-          RADAR_FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force || false }}
+          RADAR_FORCE: ${{ github.event_name != 'workflow_dispatch' || inputs.force }}
         run: |
           set +e
           refresh_args=(--database "$RADAR_DB")
@@ -66,6 +66,16 @@ jobs:
           fi
           ai-radar refresh "${refresh_args[@]}" > refresh-report.json
           refresh_code=$?
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path("refresh-report.json")
+          payload = json.loads(path.read_text(encoding="utf-8"))
+          payload["refresh_mode"] = "forced" if os.environ.get("RADAR_FORCE") == "true" else "cadence"
+          path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          PY
           set -e
           echo "exit_code=$refresh_code" >> "$GITHUB_OUTPUT"
           # A source-level partial report is safe for the site builder to
@@ -84,7 +94,9 @@ jobs:
           ai-radar site build \
             --database .ci-cache/radar.sqlite3 \
             --output _site \
-            --base-url https://ai-resource-radar.github.io/ai-resource-radar/
+            --base-url https://ai-resource-radar.github.io/ai-resource-radar/ \
+            --source-revision "${GITHUB_SHA}" \
+            --refresh-report refresh-report.json
 
       - name: Verify public site and publication gate
         run: |
@@ -105,6 +117,13 @@ jobs:
               raise SystemExit(f"pages_gate_rejected_status:{status!r}")
           if payload.get("publishable") is False:
               raise SystemExit("pages_gate_not_publishable")
+          if payload.get("source_revision") != "${{ github.sha }}":
+              raise SystemExit("pages_gate_revision_mismatch")
+          if int(payload.get("data_age_seconds") or 999999) > 1800:
+              raise SystemExit("pages_gate_data_too_old")
+          health = payload.get("source_health") or {}
+          if health.get("total") != 23 or health.get("stale") or health.get("never"):
+              raise SystemExit("pages_gate_source_health")
           print(f"public site gate: {status}")
           print(f"files: {payload.get('files', [])}")
           print(f"source health: {payload.get('source_health', {})}")

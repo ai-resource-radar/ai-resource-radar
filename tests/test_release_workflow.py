@@ -21,6 +21,9 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("python -m unittest discover", workflow)
         self.assertIn("gitleaks/gitleaks-action", workflow)
         self.assertIn("macos_poster_ocr.swift", workflow)
+        self.assertIn("src/ai_resource_radar/frontend_shared", workflow)
+        for name in ("cards.js", "cards.css", "dom.js", "formatters.js", "radar-tokens.css"):
+            self.assertIn(name, workflow)
 
     def test_release_checksums_use_downloaded_asset_basenames(self) -> None:
         workflow = (

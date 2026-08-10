@@ -1,5 +1,6 @@
 /* Legacy URL retained; the dashboard stylesheet is now a native CSS module set. */
 @import url("/ai-radar-assets/styles/tokens.css");
+@import url("/ai-radar-shared/cards.css");
 @import url("/ai-radar-assets/styles/base.css");
 @import url("/ai-radar-assets/styles/layout.css");
 @import url("/ai-radar-assets/styles/components.css");

@@ -18,6 +18,8 @@ class PagesWorkflowTests(unittest.TestCase):
         self.assertIn("workflow_dispatch:", self.text)
         self.assertIn("force:", self.text)
         self.assertIn("type: boolean", self.text)
+        self.assertRegex(self.text, r"force:\s*\n(?:\s+.*\n)*?\s+default: true")
+        self.assertIn("github.event_name != 'workflow_dispatch' || inputs.force", self.text)
 
     def test_refresh_is_keyless_and_cache_is_only_ci_sqlite(self) -> None:
         self.assertIn("uses: actions/cache@v4", self.text)
@@ -25,6 +27,9 @@ class PagesWorkflowTests(unittest.TestCase):
         self.assertIn("github.run_id", self.text)
         self.assertNotIn("cache: pip", self.text)
         self.assertIn("ai-radar refresh", self.text)
+        self.assertIn('refresh_args+=(--force)', self.text)
+        self.assertIn('payload["refresh_mode"]', self.text)
+        self.assertIn('RADAR_FORCE', self.text)
         self.assertNotIn("secrets.", self.text)
         self.assertNotIn("OPENAI_API_KEY", self.text)
         self.assertNotIn("ANTHROPIC_API_KEY", self.text)
@@ -32,6 +37,8 @@ class PagesWorkflowTests(unittest.TestCase):
     def test_build_gate_precedes_pages_upload_and_deploy(self) -> None:
         self.assertIn("ai-radar site build", self.text)
         self.assertIn("--base-url https://ai-resource-radar.github.io/ai-resource-radar/", self.text)
+        self.assertIn('--source-revision "${GITHUB_SHA}"', self.text)
+        self.assertIn("--refresh-report refresh-report.json", self.text)
         self.assertIn("data/manifest.json", self.text)
         self.assertIn('status not in {"healthy", "partial"}', self.text)
         self.assertIn("uses: actions/upload-pages-artifact@v3", self.text)
@@ -41,6 +48,10 @@ class PagesWorkflowTests(unittest.TestCase):
         self.assertIn("name: github-pages", self.text)
         self.assertIn("pages: write", self.text)
         self.assertIn("id-token: write", self.text)
+        self.assertIn("pages_gate_revision_mismatch", self.text)
+        self.assertIn("pages_gate_data_too_old", self.text)
+        self.assertIn("health.get(\"total\") != 23", self.text)
+        self.assertIn('health.get("stale") or health.get("never")', self.text)
 
         gate = self.text.index("Verify public site and publication gate")
         upload = self.text.index("Upload Pages artifact")
