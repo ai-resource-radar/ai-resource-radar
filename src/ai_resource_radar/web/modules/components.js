@@ -123,6 +123,40 @@ function appendPolicyGuide(resource, detailRoot, options = {}) {
   }
 }
 
+function appendIntegrationExamples(resource, detailRoot, ctx) {
+  const profile = ctx.state.providerProfiles?.get(String(resource.provider || "").toLowerCase());
+  const templates = profile?.integration?.templates;
+  if (!templates || !Object.keys(templates).length) return;
+  const disclosure = element("details", "integration-disclosure");
+  disclosure.append(element("summary", "", "接入示例 · curl / Python / 编程工具"));
+  const intro = element("p", "offer-provider", "只展示经过协议门禁的确定性模板。密钥请放在对应环境变量中，页面不会读取或保存。 ");
+  disclosure.append(intro);
+  const labels = { curl: "curl", python: "Python", openclaw: "OpenClaw", cursor: "Cursor", codex: "Codex" };
+  Object.entries(templates).forEach(([client, snippet]) => {
+    const block = element("section", "integration-snippet");
+    const heading = element("div", "integration-snippet-heading");
+    heading.append(element("strong", "", labels[client] || client));
+    const copy = element("button", "", "复制");
+    copy.type = "button";
+    const pre = element("pre", "");
+    const code = element("code", "", snippet);
+    pre.append(code);
+    copy.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(code.textContent || "");
+        copy.textContent = "已复制";
+        window.setTimeout(() => { copy.textContent = "复制"; }, 1400);
+      } catch {
+        pre.focus();
+      }
+    });
+    heading.append(copy);
+    block.append(heading, pre);
+    disclosure.append(block);
+  });
+  detailRoot.append(disclosure);
+}
+
 export function createDialogActions({ dialog, detailRoot, dialogController, ctx }) {
   function openDialog(trigger) { dialogController.open(trigger); }
   function showOffer(resource, trigger) {
@@ -142,6 +176,7 @@ export function createDialogActions({ dialog, detailRoot, dialogController, ctx 
     if (resource.evidence) reasons.append(element("span", "evidence-label", "来源摘录"), element("p", "", resource.evidence.evidence_excerpt || "来源已记录"));
     disclosure.append(reasons);
     detailRoot.append(disclosure);
+    appendIntegrationExamples(resource, detailRoot, ctx);
     openDialog(trigger);
   }
   function showProvider(resources, trigger) {
@@ -166,6 +201,7 @@ export function createDialogActions({ dialog, detailRoot, dialogController, ctx 
       list.append(button);
     });
     detailRoot.append(modelHeading, list);
+    appendIntegrationExamples(resources[0], detailRoot, ctx);
     openDialog(trigger);
   }
   return { openDialog, showOffer, showProvider };

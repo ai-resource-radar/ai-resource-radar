@@ -12,16 +12,24 @@ const DATA = {
   manifest: "data/manifest.json",
   summary: "data/summary.json",
   sources: "data/source-health.json",
+  featured: "data/featured.json",
+  importantChanges: "data/important-changes.json",
   resources: "data/resources.json",
   tokenPrices: "data/token-prices.json",
   gpuPrices: "data/gpu-prices.json",
   changes: "data/changes.json",
 };
+const PUBLIC_VERSION = "0.7.0";
 const PAGE_SIZE = 20;
 const RESOURCE_VIEWS = new Set(["recommended", "token", "gpu", "grant"]);
 const PRICE_VIEWS = new Set(["token-prices", "gpu-prices"]);
 const KNOWN_VIEWS = new Set([...RESOURCE_VIEWS, ...PRICE_VIEWS]);
 const IMPORTANT_CHANGES = new Set(["removed", "quota_changed", "limits_changed", "expiring"]);
+const INITIAL_DATASETS = ["manifest", "summary", "sources", "featured", "importantChanges"];
+const VIEW_DATASET = {
+  token: "resources", gpu: "resources", grant: "resources",
+  "token-prices": "tokenPrices", "gpu-prices": "gpuPrices",
+};
 
 const COPY = {
   "zh-CN": {
@@ -82,8 +90,14 @@ const COPY = {
 
 const state = {
   locale: "zh-CN", group: "free", view: "recommended", page: 1,
-  data: {}, rows: [], filtered: [],
+  data: {}, rows: [], filtered: [], routeSequence: 0, loadingKey: "",
 };
+// Keep each exported dataset in memory for the current page session. A request
+// record is separate so a route switch can abort obsolete work without losing
+// already resolved data.
+const sessionCache = new Map();
+const datasetRequests = new Map();
+const datasetSequences = new Map();
 const $ = (id) => document.getElementById(id);
 const t = (key) => COPY[state.locale]?.[key] || key;
 const items = (payload) => Array.isArray(payload) ? payload : Array.isArray(payload?.items) ? payload.items : [];
@@ -112,6 +126,7 @@ function readRoute() {
     if (value && [...$(id).options].some((option) => option.value === value)) $(id).value = value;
   }
   if (!params.has("sort")) $("sort-filter").value = defaultSort();
+  state.routeSequence += 1;
 }
 
 function writeRoute() {
@@ -136,7 +151,7 @@ function recommendedRows(resources) {
     && row.requires_card === "no"
     && ["supported", "unknown"].includes(row.mainland_status)
   )).filter((row) => {
-    const provider = String(row.provider || "").toLowerCase();
+    const provider = String(row.provider_slug || row.provider || "").toLowerCase();
     if (seen.has(provider)) return false;
     seen.add(provider);
     return true;
@@ -146,8 +161,8 @@ function recommendedRows(resources) {
 function currentRows() {
   if (state.view === "token-prices") return items(state.data.tokenPrices);
   if (state.view === "gpu-prices") return items(state.data.gpuPrices);
+  if (state.view === "recommended") return recommendedRows(items(state.data.featured));
   const resources = items(state.data.resources);
-  if (state.view === "recommended") return recommendedRows(resources);
   return resources.filter((row) => row.kind === state.view);
 }
 
@@ -170,7 +185,7 @@ function filteredRows() {
   const card = $("card-filter").value;
   const mainland = $("mainland-filter").value;
   state.filtered = sortRows(currentRows().filter((row) => {
-    const searchable = `${row.provider || ""} ${row.title || ""} ${row.model || ""} ${row.gpu_model || ""}`.toLowerCase();
+    const searchable = `${row.provider || ""} ${row.provider_slug || ""} ${row.title || ""} ${row.model || ""} ${row.gpu_model || ""}`.toLowerCase();
     if (query && !searchable.includes(query)) return false;
     if (provider && row.provider !== provider) return false;
     if (state.group === "free") {
@@ -192,11 +207,12 @@ function renderSummary() {
   const manifest = state.data.manifest || {};
   const counts = manifest.counts || {};
   const resources = items(state.data.resources);
+  const imageCount = counts.free_image_generation ?? counts.image_generation ?? (state.data.resources ? resources.filter((row) => row.free_image_generation).length : 0);
   const metrics = [
-    [t("freeCount"), counts.resources, state.locale === "en" ? "verified offers" : "已核验政策"],
+    [t("freeCount"), counts.resources, state.locale === "en" ? "public policy entries" : "公开政策条目"],
     [t("priceCount"), Number(counts.token_prices || 0) + Number(counts.gpu_prices || 0), state.locale === "en" ? "normalized rows" : "统一价格口径"],
     [t("sourceCount"), `${manifest.source_health?.fresh || 0}/${manifest.source_health?.total || 0}`, state.locale === "en" ? "official + community" : "官方与社区来源"],
-    [t("imageCount"), resources.filter((row) => row.free_image_generation).length, state.locale === "en" ? "officially verified" : "官方核验"],
+    [t("imageCount"), imageCount, state.locale === "en" ? "officially verified" : "官方核验"],
   ];
   for (const [label, value, note] of metrics) {
     const card = element("article", "summary-card");
@@ -206,7 +222,8 @@ function renderSummary() {
   $("last-updated").textContent = formatTime(manifest.radar_refreshed_at, state.locale);
   const revision = textValue(manifest.source_revision, "").slice(0, 7);
   $("snapshot-revision").textContent = `${manifest.package_version ? `v${manifest.package_version}` : ""}${revision ? ` · ${revision}` : ""}` || `schema ${manifest.schema_version || "—"}`;
-  $("package-version").textContent = manifest.package_version ? `v${manifest.package_version}` : "v0.6.1";
+  const packageVersion = textValue(manifest.package_version, PUBLIC_VERSION).replace(/^v/i, "");
+  $("package-version").textContent = `v${packageVersion}`;
 }
 
 function renderHealth() {
@@ -241,12 +258,12 @@ function renderFeatured() {
   if (!show) return;
   const root = $("featured-resources");
   root.replaceChildren();
-  recommendedRows(items(state.data.resources)).slice(0, 3).forEach((row, index) => root.append(createOfferCard(row, { locale: state.locale, primary: index === 0 })));
+  recommendedRows(items(state.data.featured)).slice(0, 3).forEach((row, index) => root.append(createOfferCard(row, { locale: state.locale, primary: index === 0 })));
 }
 
 function renderChanges() {
   const section = $("important-changes");
-  const rows = items(state.data.changes).filter((row) => ["high", "critical"].includes(row.importance) || IMPORTANT_CHANGES.has(row.change_type)).slice(0, 3);
+  const rows = items(state.data.importantChanges).filter((row) => ["high", "critical"].includes(row.importance) || IMPORTANT_CHANGES.has(row.change_type)).slice(0, 3);
   section.hidden = !(state.group === "free" && state.view === "recommended" && rows.length);
   const root = $("changes-list");
   root.replaceChildren();
@@ -328,6 +345,16 @@ function renderNavigation() {
 }
 
 function renderResults() {
+  const requiredDataset = VIEW_DATASET[state.view];
+  if (requiredDataset && !sessionCache.has(requiredDataset)) {
+    const root = $("content");
+    root.replaceChildren();
+    root.setAttribute("aria-busy", "true");
+    $("load-status").classList.remove("is-error");
+    $("load-status").textContent = t("status.loading");
+    $("pager").hidden = true;
+    return;
+  }
   const rows = filteredRows();
   const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   state.page = Math.min(state.page, pages);
@@ -377,43 +404,119 @@ function setLocale(locale) {
 function resetPageAndRender() { state.page = 1; render(); }
 function currentDownloadKey() { return state.view === "token-prices" ? "tokenPrices" : state.view === "gpu-prices" ? "gpuPrices" : "resources"; }
 
-async function load() {
-  try {
-    const entries = await Promise.all(Object.entries(DATA).map(async ([key, url]) => {
-      const response = await fetch(url, { cache: "no-store" });
-      if (!response.ok) throw new Error(`public_snapshot_${response.status}`);
-      return [key, await response.json()];
-    }));
-    entries.forEach(([key, value]) => { state.data[key] = value; });
-    readRoute();
-    render();
-  } catch {
-    $("source-health").classList.add("is-error");
-    $("health-label").textContent = state.locale === "en" ? "Snapshot unavailable" : "公开快照不可用";
-    $("load-status").classList.add("is-error");
-    $("load-status").textContent = state.locale === "en" ? "The last public snapshot could not be loaded." : "暂时无法读取公开快照。";
-    $("content").setAttribute("aria-busy", "false");
+function datasetForView(view = state.view) { return VIEW_DATASET[view] || ""; }
+
+function isAbortError(error) { return error?.name === "AbortError"; }
+
+function loadDataset(key) {
+  if (!DATA[key]) return Promise.reject(new Error(`unknown_public_dataset:${key}`));
+  if (sessionCache.has(key)) {
+    state.data[key] = sessionCache.get(key);
+    return Promise.resolve(sessionCache.get(key));
   }
+  const active = datasetRequests.get(key);
+  if (active) return active.promise;
+
+  const sequence = (datasetSequences.get(key) || 0) + 1;
+  datasetSequences.set(key, sequence);
+  const controller = new AbortController();
+  const promise = fetch(DATA[key], { cache: "no-store", signal: controller.signal })
+    .then((response) => {
+      if (!response.ok) throw new Error(`public_snapshot_${response.status}`);
+      return response.json();
+    })
+    .then((payload) => {
+      // An aborted or superseded response must never overwrite a newer route's
+      // dataset. The sequence check also covers fetch implementations that do
+      // not reject promptly after AbortController.abort().
+      if (datasetSequences.get(key) !== sequence) return undefined;
+      sessionCache.set(key, payload);
+      state.data[key] = payload;
+      return payload;
+    })
+    .finally(() => {
+      if (datasetRequests.get(key)?.sequence === sequence) datasetRequests.delete(key);
+    });
+  datasetRequests.set(key, { controller, promise, sequence });
+  return promise;
+}
+
+function abortDataset(key) {
+  const request = datasetRequests.get(key);
+  if (!request) return;
+  datasetSequences.set(key, request.sequence + 1);
+  request.controller.abort();
+  datasetRequests.delete(key);
+}
+
+function abortObsoleteRequests(requiredKey = "") {
+  for (const key of datasetRequests.keys()) {
+    if (!INITIAL_DATASETS.includes(key) && key !== requiredKey) abortDataset(key);
+  }
+}
+
+function showSnapshotError() {
+  $("source-health").classList.add("is-error");
+  $("health-label").textContent = state.locale === "en" ? "Snapshot unavailable" : "公开快照不可用";
+  $("load-status").classList.add("is-error");
+  $("load-status").textContent = state.locale === "en" ? "The last public snapshot could not be loaded." : "暂时无法读取公开快照。";
+  $("content").setAttribute("aria-busy", "false");
+}
+
+async function ensureViewData(sequence = state.routeSequence) {
+  const key = datasetForView();
+  abortObsoleteRequests(key);
+  if (!key || sessionCache.has(key)) {
+    state.loadingKey = "";
+    if (sequence === state.routeSequence) render();
+    return;
+  }
+  state.loadingKey = key;
+  if (sequence === state.routeSequence) render();
+  try {
+    await loadDataset(key);
+  } catch (error) {
+    if (!isAbortError(error) && sequence === state.routeSequence) showSnapshotError();
+    return;
+  }
+  if (sequence !== state.routeSequence || key !== datasetForView()) return;
+  state.loadingKey = "";
+  render();
+}
+
+async function loadInitial() {
+  readRoute();
+  const results = await Promise.allSettled(INITIAL_DATASETS.map((key) => loadDataset(key)));
+  const failed = results.find((result) => result.status === "rejected");
+  if (failed && !state.data.manifest) {
+    showSnapshotError();
+    return;
+  }
+  render();
+  if (failed) $("load-status").textContent = state.locale === "en" ? "Some public data is temporarily unavailable." : "部分公开数据暂时不可用。";
+  await ensureViewData(state.routeSequence);
+}
+
+function selectView(view) {
+  state.view = KNOWN_VIEWS.has(view) ? view : "recommended";
+  state.group = groupFor(state.view);
+  state.page = 1;
+  state.routeSequence += 1;
+  $("provider-filter").value = "";
+  $("sort-filter").value = defaultSort();
+  abortObsoleteRequests(datasetForView());
+  render();
+  ensureViewData(state.routeSequence);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   state.locale = localStorage.getItem("ai-radar-locale") || (/^en/i.test(navigator.language) ? "en" : "zh-CN");
   $("language-toggle").addEventListener("click", () => setLocale(state.locale === "en" ? "zh-CN" : "en"));
   document.querySelectorAll("[data-group]").forEach((button) => button.addEventListener("click", () => {
-    state.group = button.dataset.group;
-    state.view = defaultView(state.group);
-    state.page = 1;
-    $("provider-filter").value = "";
-    $("sort-filter").value = defaultSort();
-    render();
+    selectView(defaultView(button.dataset.group));
   }));
   document.querySelectorAll("[data-view]").forEach((button) => button.addEventListener("click", () => {
-    state.view = button.dataset.view;
-    state.group = groupFor(state.view);
-    state.page = 1;
-    $("provider-filter").value = "";
-    $("sort-filter").value = defaultSort();
-    render();
+    selectView(button.dataset.view);
   }));
   ["search-input", "provider-filter", "verification-filter", "card-filter", "mainland-filter", "sort-filter"].forEach((id) => $(id).addEventListener("input", resetPageAndRender));
   $("clear-filters").addEventListener("click", () => {
@@ -429,7 +532,12 @@ document.addEventListener("DOMContentLoaded", () => {
   $("next-page").addEventListener("click", () => { state.page += 1; render(); $("catalog-title").scrollIntoView({ block: "start" }); });
   $("download-json").addEventListener("click", () => { location.href = DATA[currentDownloadKey()]; });
   $("download-csv").addEventListener("click", () => { const key = currentDownloadKey() === "tokenPrices" ? "token-prices" : currentDownloadKey() === "gpuPrices" ? "gpu-prices" : "resources"; location.href = `data/${key}.csv`; });
-  window.addEventListener("popstate", () => { readRoute(); render(); });
+  window.addEventListener("popstate", () => {
+    readRoute();
+    abortObsoleteRequests(datasetForView());
+    render();
+    ensureViewData(state.routeSequence);
+  });
   setLocale(state.locale);
-  load();
+  loadInitial();
 });

@@ -15,6 +15,10 @@ from ai_resource_radar.notifications import (
     notification_read,
 )
 from ai_resource_radar.pricing import list_gpu_prices, list_token_prices
+from ai_resource_radar.provider_profiles import (
+    integration_public_rows,
+    provider_public_rows,
+)
 from ai_resource_radar.poster import (
     daily_report_status,
     generate_daily_poster,
@@ -109,6 +113,13 @@ class AiRadarDashboard:
     def offers(self, **filters: Any) -> tuple[dict[str, Any], ...]:
         filters.setdefault("include_pricing", False)
         return list_offers(self.path, **filters)
+
+    def provider_profiles(self) -> dict[str, Any]:
+        return {
+            "schema_version": "1.0",
+            "providers": provider_public_rows(),
+            "integrations": integration_public_rows(),
+        }
 
     def changes(self, *, days: int, limit: int) -> tuple[dict[str, Any], ...]:
         return list_changes(self.path, days=days, limit=limit)

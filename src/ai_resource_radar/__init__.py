@@ -1,6 +1,6 @@
 """Stable public facade for the deterministic AI Resource Radar core."""
 
-__version__ = "0.6.1"
+__version__ = "0.7.0"
 
 from ai_resource_radar.interfaces.http import ApiResponse, RadarDashboardPort
 
@@ -34,6 +34,21 @@ from ai_resource_radar.poster import (
     test_poster_model,
 )
 from ai_resource_radar.pricing import list_gpu_prices, list_token_prices
+from ai_resource_radar.provider_profiles import (
+    COMMUNITY_SOURCE_IDS,
+    OFFICIAL_SOURCE_IDS,
+    PROVIDER_BY_ALIAS,
+    PROVIDER_BY_SLUG,
+    PROVIDER_BY_SOURCE_ID,
+    PROVIDER_PROFILES,
+    ProviderProfile,
+    get_provider_profile,
+    integration_public_rows,
+    provider_for_record,
+    provider_public_rows,
+    provider_slug_for,
+    render_integration_snippets,
+)
 from ai_resource_radar.runtime import RefreshReport, refresh
 from ai_resource_radar.service import backup_database
 from ai_resource_radar.sources import (
@@ -85,6 +100,13 @@ __all__ = [
     "IMAGE_MODELS",
     "ImageModelSpec",
     "OfferObservation",
+    "COMMUNITY_SOURCE_IDS",
+    "OFFICIAL_SOURCE_IDS",
+    "PROVIDER_BY_ALIAS",
+    "PROVIDER_BY_SLUG",
+    "PROVIDER_BY_SOURCE_ID",
+    "PROVIDER_PROFILES",
+    "ProviderProfile",
     "OpenAIImageGenerator",
     "OpenClawImageGenerator",
     "OperationLock",
@@ -97,6 +119,7 @@ __all__ = [
     "configure_poster",
     "daily_report_status",
     "find_image_model",
+    "get_provider_profile",
     "generate_daily_poster",
     "get_image_model",
     "latest_daily_report",
@@ -105,12 +128,16 @@ __all__ = [
     "list_gpu_prices",
     "list_offers",
     "list_token_prices",
+    "integration_public_rows",
     "list_poster_models",
     "poster_benchmark_status",
     "normalize_modalities",
     "operation_lock",
     "operation_lock_status",
     "poster_configuration",
+    "provider_for_record",
+    "provider_public_rows",
+    "provider_slug_for",
     "review_poster_benchmark",
     "radar_summary",
     "refresh",
@@ -122,6 +149,7 @@ __all__ = [
     "test_poster_model",
     "resolve_daily_poster",
     "run_poster_benchmark",
+    "render_integration_snippets",
     "OFFICIAL_TIP_SOURCES",
     "TIP_CATEGORIES",
     "add_tip",

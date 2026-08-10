@@ -81,7 +81,13 @@ jobs:
           /tmp/ai-radar-release-smoke/bin/python - <<'PY'
           from importlib.resources import files
           root = files("ai_resource_radar").joinpath("public_web")
-          for name in ("index.html", "styles.css", "app.js"):
+          for name in (
+              "index.html",
+              "styles.css",
+              "app.js",
+              "provider.css",
+              "provider.js",
+          ):
               assert root.joinpath(name).is_file(), name
           dashboard = files("ai_resource_radar").joinpath("web")
           for name in (

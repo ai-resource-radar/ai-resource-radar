@@ -12,8 +12,14 @@ import {
 } from "./formatters.js";
 
 const COPY = {
-  "zh-CN": { get: "送什么", threshold: "门槛", how: "怎么领", evidence: "官方证据", claim: "去领取 ↗", details: "查看步骤", verified: "最近核验" },
-  en: { get: "What you get", threshold: "Requirements", how: "How to claim", evidence: "Evidence", claim: "Claim ↗", details: "View steps", verified: "Verified" },
+  "zh-CN": {
+    get: "送什么", threshold: "门槛", how: "怎么领", evidence: "官方证据", claim: "去领取 ↗", details: "查看步骤",
+    providerDetails: "服务商详情 ↗", report: "政策过期/数据有误", verified: "最近核验",
+  },
+  en: {
+    get: "What you get", threshold: "Requirements", how: "How to claim", evidence: "Evidence", claim: "Claim ↗", details: "View steps",
+    providerDetails: "Provider details ↗", report: "Report stale or incorrect policy", verified: "Verified",
+  },
 };
 
 function providerInitials(provider) {
@@ -27,10 +33,12 @@ export function createOfferCard(resource, options = {}) {
   const card = element("article", classes);
   const header = element("div", "radar-card-header feature-identity");
   const provider = element("div", "radar-card-provider feature-provider");
+  const providerName = resource.provider || resource.provider_slug || "AI";
   provider.append(
-    element("span", "radar-card-provider-icon feature-provider-icon", providerInitials(resource.provider)),
-    element("span", "", `${resource.provider || "AI"} · ${kindLabel(resource.kind, locale)}`),
+    element("span", "radar-card-provider-icon feature-provider-icon", providerInitials(providerName)),
+    element("span", "", `${providerName} · ${kindLabel(resource.kind, locale)}`),
   );
+  if (resource.provider_slug) provider.dataset.providerSlug = String(resource.provider_slug);
   const tier = element("span", "radar-card-tier feature-tier", resource.priority_tier || "—");
   tier.dataset.tier = resource.priority_tier || "";
   header.append(provider, tier);
@@ -58,8 +66,13 @@ export function createOfferCard(resource, options = {}) {
   const actions = element("div", "radar-card-actions feature-actions");
   const claim = safeLink(copy.claim, actionUrl(resource, locale), "radar-card-primary feature-claim");
   const source = safeLink(copy.evidence, evidence.source_url || resource.homepage_url, "radar-card-secondary radar-card-evidence");
+  const providerDetailsUrl = resource.provider_urls?.[locale] || resource.provider_url;
+  const providerDetails = safeLink(copy.providerDetails, providerDetailsUrl, "radar-card-secondary radar-card-provider-details");
+  const report = safeLink(copy.report, resource.report_url, "radar-card-secondary radar-card-feedback");
   if (claim) actions.append(claim);
   if (source && (!claim || source.href !== claim.href)) actions.append(source);
+  if (providerDetails) actions.append(providerDetails);
+  if (report) actions.append(report);
   if (typeof options.onDetails === "function") {
     const details = element("button", "radar-card-secondary feature-details", options.detailsLabel || copy.details);
     details.type = "button";

@@ -11,6 +11,7 @@ import csv
 from datetime import datetime
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -19,6 +20,17 @@ from typing import Any, Iterable
 from urllib.parse import urlparse
 
 from ai_resource_radar import __version__
+from ai_resource_radar.provider_pages import (
+    decorate_provider_record,
+    provider_page_url,
+    public_https_url,
+    render_provider_page,
+)
+from ai_resource_radar.provider_profiles import (
+    PROVIDER_PROFILES,
+    integration_public_rows,
+    provider_public_rows,
+)
 from ai_resource_radar.public_locales import presentation_for
 from ai_resource_radar.pricing import list_gpu_prices, list_token_prices
 from ai_resource_radar.sources import SOURCES
@@ -30,7 +42,7 @@ from ai_resource_radar.store import (
 )
 
 
-PUBLIC_SCHEMA_VERSION = "1.1"
+PUBLIC_SCHEMA_VERSION = "1.2"
 DATASET_ID = "ai-resource-radar-public"
 MAX_PAGE = 500
 FREE_OFFER_TYPES = {"recurring_free", "variable_free", "grant"}
@@ -40,10 +52,58 @@ _SECRET_KEY = re.compile(
     r"(?:api[_-]?key|access[_-]?token|secret|password|cookie|authorization|account|session|credential|private[_-]?key|local[_-]?path)",
     re.IGNORECASE,
 )
+_ANALYTICS_TOKEN = re.compile(r"^[A-Za-z0-9_-]{16,128}$")
+_CLOUDFLARE_SCRIPT = "https://static.cloudflareinsights.com/beacon.min.js"
 
 
 class PublicSiteError(RuntimeError):
     """Raised when a public snapshot must not replace the previous snapshot."""
+
+
+def _analytics_markup(provider: str) -> tuple[str, str]:
+    """Return an opt-in public beacon and the matching restrictive CSP.
+
+    The token identifies a public hostname; it is deliberately accepted only
+    through the environment so it cannot leak through process arguments. The
+    local dashboard never calls this builder with analytics enabled.
+    """
+
+    if provider == "none":
+        return "", (
+            "default-src 'self'; script-src 'self'; style-src 'self'; "
+            "img-src 'self' data:; connect-src 'self'; font-src 'self'; "
+            "object-src 'none'; base-uri 'self'; form-action 'none'"
+        )
+    if provider != "cloudflare":
+        raise ValueError("invalid_analytics_provider")
+    token = os.environ.get("AI_RADAR_CLOUDFLARE_ANALYTICS_TOKEN", "").strip()
+    if not _ANALYTICS_TOKEN.fullmatch(token):
+        raise PublicSiteError("publish_gate_invalid_cloudflare_analytics_token")
+    payload = json.dumps({"token": token, "spa": False}, separators=(",", ":"))
+    script = (
+        f'<script defer src="{_CLOUDFLARE_SCRIPT}" '
+        f"data-cf-beacon='{payload}'></script>"
+    )
+    csp = (
+        "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; "
+        "style-src 'self'; img-src 'self' data:; "
+        "connect-src 'self' https://cloudflareinsights.com; font-src 'self'; "
+        "object-src 'none'; base-uri 'self'; form-action 'none'"
+    )
+    return script, csp
+
+
+def _inject_analytics(content: str, *, provider: str) -> str:
+    script, csp = _analytics_markup(provider)
+    content = re.sub(
+        r'(<meta http-equiv="Content-Security-Policy" content=")[^"]*(">)',
+        lambda match: match.group(1) + csp + match.group(2),
+        content,
+        count=1,
+    )
+    if script:
+        content = content.replace("</head>", f"    {script}\n  </head>", 1)
+    return content
 
 
 def _time(value: Any) -> datetime | None:
@@ -93,13 +153,7 @@ def _jsonable(value: Any, *, depth: int = 0) -> Any:
 
 
 def _safe_url(value: Any) -> str | None:
-    if not value:
-        return None
-    text = str(value).strip()
-    parsed = urlparse(text)
-    if parsed.scheme not in SAFE_URL_SCHEMES or not parsed.netloc:
-        return None
-    return text[:2_000]
+    return public_https_url(value) or None
 
 
 def _evidence(record: dict[str, Any]) -> dict[str, Any] | None:
@@ -228,6 +282,46 @@ def _public_change(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _featured_resources(resources: list[dict[str, Any]], *, limit: int = 12) -> list[dict[str, Any]]:
+    """Select a compact, deterministic landing-page subset.
+
+    The browser can render the first useful viewport without downloading the
+    full catalogue. The full resources URL remains unchanged for machines and
+    for users who open a category view.
+    """
+
+    tier_order = {"A": 0, "B": 1, "C": 2, "D": 3}
+    mainland_order = {"supported": 0, "unknown": 1, "unsupported": 2}
+    ordered = sorted(
+        (
+            row
+            for row in resources
+            if row.get("verification_level") in OFFICIAL_LEVELS
+            and row.get("priority_tier") in {"A", "B"}
+            and row.get("requires_card") == "no"
+            and row.get("mainland_status") in {"supported", "unknown"}
+        ),
+        key=lambda row: (
+            tier_order.get(str(row.get("priority_tier")), 9),
+            mainland_order.get(str(row.get("mainland_status")), 9),
+            -(float(row.get("estimated_usd_value") or 0)),
+            str(row.get("provider") or "").casefold(),
+            str(row.get("offer_id") or ""),
+        ),
+    )
+    selected: list[dict[str, Any]] = []
+    providers: set[str] = set()
+    for row in ordered:
+        provider = str(row.get("provider") or "").casefold()
+        if provider in providers:
+            continue
+        providers.add(provider)
+        selected.append(row)
+        if len(selected) >= limit:
+            break
+    return selected
+
+
 def _write_json(path: Path, value: Any) -> None:
     path.write_text(
         json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
@@ -301,6 +395,7 @@ def build_public_site(
     now: datetime | None = None,
     source_revision: str | None = None,
     refresh_report: Path | dict[str, Any] | None = None,
+    analytics_provider: str = "none",
 ) -> dict[str, Any]:
     """Atomically build a public static snapshot, preserving an old output on failure."""
 
@@ -309,18 +404,29 @@ def build_public_site(
     parsed_base = urlparse(base_url)
     if parsed_base.scheme not in SAFE_URL_SCHEMES or not parsed_base.netloc:
         raise ValueError("invalid_public_base_url")
+    # Validate configuration before reading or transforming the snapshot so a
+    # production mistake preserves the prior atomic site untouched.
+    analytics_script, analytics_csp = _analytics_markup(analytics_provider)
     current = (now or datetime.now().astimezone()).astimezone()
     generated_at = current.isoformat(timespec="seconds")
     report = _load_refresh_report(refresh_report)
 
     try:
-        raw_resources = [
+        raw_catalog = [
             record
             for kind in ("token", "gpu", "grant")
             for record in _page_offers(database, kind=kind, include_pricing=False)
+        ]
+        raw_resources = [
+            record for record in raw_catalog
             if record.get("offer_type") in FREE_OFFER_TYPES
         ]
         resources = [_resource(record) for record in raw_resources]
+        provider_offers = [
+            _resource(record)
+            for record in raw_catalog
+            if record.get("verification_level") in OFFICIAL_LEVELS
+        ]
         token_prices = [_public_price(row, kind="token") for row in _page_prices(database, kind="token")]
         gpu_prices = [_public_price(row, kind="gpu") for row in _page_prices(database, kind="gpu")]
         changes = [_public_change(row) for row in list_changes(database, days=30, limit=MAX_PAGE)]
@@ -333,6 +439,43 @@ def build_public_site(
     gate = _gate(resources, token_prices, gpu_prices)
     if not gate["publishable"]:
         raise PublicSiteError("publish_gate_failed:" + ",".join(gate["missing"]))
+    revision = (source_revision or "local")[:64]
+    resources = [
+        decorate_provider_record(
+            row, base_url=base_url, source_revision=revision
+        )
+        for row in resources
+    ]
+    provider_offers = [
+        decorate_provider_record(
+            row, base_url=base_url, source_revision=revision
+        )
+        for row in provider_offers
+    ]
+    token_prices = [
+        decorate_provider_record(
+            row, base_url=base_url, source_revision=revision
+        )
+        for row in token_prices
+    ]
+    gpu_prices = [
+        decorate_provider_record(
+            row, base_url=base_url, source_revision=revision
+        )
+        for row in gpu_prices
+    ]
+    providers = provider_public_rows()
+    for row in providers:
+        row["provider_urls"] = {
+            "zh-CN": provider_page_url(base_url, "zh-CN", row["slug"]),
+            "en": provider_page_url(base_url, "en", row["slug"]),
+        }
+    integrations = integration_public_rows()
+    for row in integrations:
+        row["provider_urls"] = {
+            "zh-CN": provider_page_url(base_url, "zh-CN", row["slug"]),
+            "en": provider_page_url(base_url, "en", row["slug"]),
+        }
     source_summary = summary.get("sources") or {}
     statuses = list(source_summary.get("items") or [])
     public_source_summary = {
@@ -402,7 +545,8 @@ def build_public_site(
             "schema_version": PUBLIC_SCHEMA_VERSION,
             "dataset": DATASET_ID,
             "package_version": __version__,
-            "source_revision": (source_revision or "local")[:64],
+            "source_revision": revision,
+            "analytics_provider": analytics_provider,
             "refresh_mode": refresh_mode,
             "refresh_started_at": refresh_started_at,
             "data_age_seconds": data_age_seconds,
@@ -415,6 +559,9 @@ def build_public_site(
                 "token_prices": len(token_prices),
                 "gpu_prices": len(gpu_prices),
                 "changes": len(changes),
+                "providers": len(providers),
+                "integrations": len(integrations),
+                "free_image_generation": sum(bool(row.get("free_image_generation")) for row in resources),
                 **gate,
             },
             "source_health": {
@@ -456,9 +603,30 @@ def build_public_site(
             ],
         },
         "resources": {"schema_version": PUBLIC_SCHEMA_VERSION, "generated_at": generated_at, "items": resources},
+        "featured": {"schema_version": PUBLIC_SCHEMA_VERSION, "generated_at": generated_at, "items": _featured_resources(resources)},
         "token-prices": {"schema_version": PUBLIC_SCHEMA_VERSION, "generated_at": generated_at, "items": token_prices},
         "gpu-prices": {"schema_version": PUBLIC_SCHEMA_VERSION, "generated_at": generated_at, "items": gpu_prices},
         "changes": {"schema_version": PUBLIC_SCHEMA_VERSION, "generated_at": generated_at, "items": changes},
+        "important-changes": {
+            "schema_version": PUBLIC_SCHEMA_VERSION,
+            "generated_at": generated_at,
+            "items": [
+                row
+                for row in changes
+                if row.get("importance") in {"high", "critical"}
+                or row.get("change_type") in {"removed", "quota_changed", "limits_changed", "expiring"}
+            ][:5],
+        },
+        "providers": {
+            "schema_version": PUBLIC_SCHEMA_VERSION,
+            "generated_at": generated_at,
+            "items": providers,
+        },
+        "integrations": {
+            "schema_version": PUBLIC_SCHEMA_VERSION,
+            "generated_at": generated_at,
+            "items": integrations,
+        },
     }
 
     parent = output.parent
@@ -479,7 +647,41 @@ def build_public_site(
             content = content.replace(
                 "https://ai-resource-radar.github.io/ai-resource-radar/", canonical
             )
+            if asset.suffix == ".html":
+                content = _inject_analytics(content, provider=analytics_provider)
             asset.write_text(content, encoding="utf-8")
+        integrations_by_slug = {row["slug"]: row for row in integrations}
+        for profile in PROVIDER_PROFILES:
+            for locale, language_path in (("zh-CN", "zh"), ("en", "en")):
+                destination = temp / language_path / "providers" / profile.slug
+                destination.mkdir(parents=True, exist_ok=True)
+                destination.joinpath("index.html").write_text(
+                    render_provider_page(
+                        profile,
+                        locale=locale,
+                        base_url=base_url,
+                        resources=provider_offers,
+                        token_prices=token_prices,
+                        gpu_prices=gpu_prices,
+                        integration=integrations_by_slug.get(profile.slug),
+                        source_revision=revision,
+                        analytics_script=analytics_script,
+                        csp=analytics_csp,
+                    ),
+                    encoding="utf-8",
+                )
+        sitemap_urls = [canonical] + [
+            provider_page_url(base_url, locale, profile.slug)
+            for profile in PROVIDER_PROFILES
+            for locale in ("zh-CN", "en")
+        ]
+        (temp / "sitemap.xml").write_text(
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            + "".join(f"  <url><loc>{url}</loc></url>\n" for url in sitemap_urls)
+            + "</urlset>\n",
+            encoding="utf-8",
+        )
         data_dir = temp / "data"
         data_dir.mkdir()
         for name, payload in data.items():

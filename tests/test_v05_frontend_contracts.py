@@ -48,6 +48,9 @@ class FrontendContractTests(unittest.TestCase):
         for route_filter in ("verified", "mainland", "provider", "tip_status"):
             self.assertIn(f'"{route_filter}"', module)
         self.assertIn("createDialogController", javascript + module)
+        self.assertIn('/api/ai-resources/providers', module)
+        self.assertIn('integration-disclosure', module)
+        self.assertIn('navigator.clipboard.writeText', module)
         self.assertIn("PRICE_PAGE_SIZE = 20", module)
         self.assertIn("appendPricePager", module)
         self.assertIn('setAttribute("role", "button")', module)

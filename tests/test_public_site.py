@@ -159,13 +159,15 @@ class PublicSiteTests(unittest.TestCase):
             with (site / "data/resources.csv").open(newline="", encoding="utf-8") as handle:
                 csv_rows = list(csv.DictReader(handle))
             public_text = "\n".join(path.read_text(encoding="utf-8") for path in (site / "data").rglob("*.json"))
-            self.assertEqual(manifest["schema_version"], "1.1")
+            self.assertEqual(manifest["schema_version"], "1.2")
             self.assertEqual(manifest["dataset"], "ai-resource-radar-public")
-            self.assertEqual(manifest["package_version"], "0.6.1")
+            self.assertEqual(manifest["package_version"], "0.7.0")
             self.assertEqual(manifest["source_revision"], "local")
             self.assertEqual(manifest["refresh_mode"], "cadence")
             self.assertEqual(manifest["data_age_seconds"], 0)
             self.assertEqual(manifest["status"], "healthy")
+            self.assertEqual(manifest["analytics_provider"], "none")
+            self.assertNotIn("static.cloudflareinsights.com", (site / "index.html").read_text(encoding="utf-8"))
             self.assertEqual(len(resources["items"]), len(csv_rows))
             self.assertTrue((site / "data/source-health.json").exists())
             self.assertNotIn("must-not-export", public_text)
@@ -278,6 +280,53 @@ class PublicSiteTests(unittest.TestCase):
             rows = _page_prices(Path("ignored"), kind="token")
         self.assertEqual(len(rows), 501)
         self.assertEqual(call.call_count, 2)
+
+    def test_cloudflare_analytics_is_explicit_and_environment_only(self) -> None:
+        token = "x" * 24
+        with TemporaryDirectory() as temp, patch.dict(
+            "os.environ", {"AI_RADAR_CLOUDFLARE_ANALYTICS_TOKEN": token}
+        ):
+            root = Path(temp)
+            database = root / "radar.sqlite3"
+            database.touch()
+            resources = {
+                "token": [offer("token", "token:free")],
+                "gpu": [offer("gpu", "gpu:free")],
+                "grant": [offer("grant", "grant:one")],
+            }
+            with patch(
+                "ai_resource_radar.public_site._page_offers",
+                side_effect=lambda _p, *, kind, include_pricing: resources[kind],
+            ), patch(
+                "ai_resource_radar.public_site._page_prices",
+                side_effect=lambda _p, *, kind: [token_price()] if kind == "token" else [gpu_price()],
+            ), patch("ai_resource_radar.public_site.list_changes", return_value=()), patch(
+                "ai_resource_radar.public_site.radar_summary", return_value=summary()
+            ):
+                manifest = build_public_site(
+                    database,
+                    root / "site",
+                    now=NOW,
+                    analytics_provider="cloudflare",
+                )
+            html = (root / "site/index.html").read_text(encoding="utf-8")
+            self.assertEqual(manifest["analytics_provider"], "cloudflare")
+            self.assertEqual(html.count("static.cloudflareinsights.com/beacon.min.js"), 1)
+            self.assertIn("https://cloudflareinsights.com", html)
+            self.assertIn(token, html)
+            self.assertNotIn("spa\":true", html)
+
+        with TemporaryDirectory() as temp, patch.dict("os.environ", {}, clear=True):
+            root = Path(temp)
+            database = root / "radar.sqlite3"
+            database.touch()
+            with self.assertRaisesRegex(PublicSiteError, "invalid_cloudflare"):
+                build_public_site(
+                    database,
+                    root / "site",
+                    now=NOW,
+                    analytics_provider="cloudflare",
+                )
 
 
 if __name__ == "__main__":

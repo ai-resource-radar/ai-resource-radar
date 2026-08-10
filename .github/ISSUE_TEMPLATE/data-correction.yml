@@ -1,0 +1,51 @@
+name: Data correction
+description: Report an outdated free policy, price, eligibility rule, or provider page.
+title: "[data correction] "
+labels:
+  - data-correction
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping keep the radar accurate. Public provider and offer details may be prefilled by the radar link. Do not include API keys, cookies, account screenshots, billing identifiers, or other private data.
+  - type: input
+    id: provider
+    attributes:
+      label: Provider or profile
+      placeholder: OpenRouter / openrouter
+    validations:
+      required: true
+  - type: input
+    id: record
+    attributes:
+      label: Offer or price ID
+      description: Use the stable ID shown by the public radar when available.
+      placeholder: offer:example
+  - type: input
+    id: source
+    attributes:
+      label: Public official source
+      placeholder: https://example.com/docs/pricing
+    validations:
+      required: true
+  - type: textarea
+    id: correction
+    attributes:
+      label: What is outdated or incorrect?
+      description: Describe the displayed fact and the corrected public fact. Keep evidence short.
+    validations:
+      required: true
+  - type: input
+    id: observed
+    attributes:
+      label: When did you verify it?
+      placeholder: 2026-08-10
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Privacy and evidence
+      options:
+        - label: The evidence is publicly accessible and contains no account-only or secret information.
+          required: true
+        - label: I understand that community reports remain unverified until an official source confirms them.
+          required: true

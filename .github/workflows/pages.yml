@@ -15,8 +15,9 @@ on:
         default: true
         type: boolean
 
-# The deploy action needs Pages write access and an OIDC token.  No user key or
-# repository variable is needed: collection and site rendering are keyless.
+# The deploy action needs Pages write access and an OIDC token. Collection is
+# keyless. The public Cloudflare Web Analytics site token is supplied as a
+# repository variable and never used by collectors or the local dashboard.
 permissions:
   contents: read
   pages: write
@@ -90,13 +91,20 @@ jobs:
         uses: actions/configure-pages@v5
 
       - name: Build public site
+        env:
+          AI_RADAR_CLOUDFLARE_ANALYTICS_TOKEN: ${{ vars.CLOUDFLARE_WEB_ANALYTICS_TOKEN }}
         run: |
+          if [[ -z "$AI_RADAR_CLOUDFLARE_ANALYTICS_TOKEN" ]]; then
+            echo "pages_gate_missing_cloudflare_analytics_token" >&2
+            exit 1
+          fi
           ai-radar site build \
             --database .ci-cache/radar.sqlite3 \
             --output _site \
             --base-url https://ai-resource-radar.github.io/ai-resource-radar/ \
             --source-revision "${GITHUB_SHA}" \
-            --refresh-report refresh-report.json
+            --refresh-report refresh-report.json \
+            --analytics-provider cloudflare
 
       - name: Verify public site and publication gate
         run: |
@@ -124,6 +132,17 @@ jobs:
           health = payload.get("source_health") or {}
           if health.get("total") != 23 or health.get("stale") or health.get("never"):
               raise SystemExit("pages_gate_source_health")
+          if payload.get("analytics_provider") != "cloudflare":
+              raise SystemExit("pages_gate_analytics_missing")
+          index_text = index.read_text(encoding="utf-8")
+          if index_text.count("static.cloudflareinsights.com/beacon.min.js") != 1:
+              raise SystemExit("pages_gate_analytics_beacon_count")
+          for required in (
+              "data/providers.json", "data/integrations.json", "data/featured.json",
+              "zh/providers/openrouter/index.html", "en/providers/openrouter/index.html",
+          ):
+              if not (root / required).is_file():
+                  raise SystemExit(f"pages_gate_missing_v07_asset:{required}")
           print(f"public site gate: {status}")
           print(f"files: {payload.get('files', [])}")
           print(f"source health: {payload.get('source_health', {})}")

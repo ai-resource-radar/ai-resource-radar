@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.7.0 — 2026-08-10
+
+- Generate 20 canonical, bilingual official-provider profiles with stable URLs, canonical/hreflang
+  metadata, current free policies, normalized prices, official evidence, and crawlable static HTML.
+- Add conservative, deterministic curl/Python/OpenClaw examples for nine verified endpoints,
+  provider-documented Cursor guidance for SambaNova and SiliconFlow, and Codex configuration only
+  for the explicitly verified OpenRouter Responses API.
+- Keep the landing payload small with `featured.json` and `important-changes.json`; load the full
+  resource, Token-price, and GPU-price datasets only when their views are opened.
+- Add card-level public data-correction links and an Issue form while filtering private fields and
+  preserving all existing JSON/CSV URLs.
+- Add opt-in, public-site-only Cloudflare Web Analytics with no cookies or custom events. Local
+  builds and the loopback Dashboard remain analytics-free.
+- Extend public manifest schema 1.2 with provider/integration datasets while keeping SQLite schema v7.
+
 ## 0.6.1 — 2026-08-10
 
 - Use one shared dependency-free design layer for the local Dashboard and public site, including

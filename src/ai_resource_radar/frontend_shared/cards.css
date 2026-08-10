@@ -25,6 +25,8 @@
 .radar-card-primary { color: #fff; background: var(--radar-green); border: 1px solid var(--radar-green); }
 .radar-card-primary:hover { background: var(--radar-green-dark); }
 .radar-card-secondary { color: var(--radar-green-dark); background: var(--radar-green-soft); border: 1px solid #c4e4cf; }
+.radar-card-feedback { color: var(--radar-red); background: #fff4f1; border-color: #f0c5ba; }
+.radar-card-provider-details, .radar-card-feedback { white-space: nowrap; }
 .radar-card-actions a:focus-visible, .radar-card-actions button:focus-visible { outline: 3px solid var(--radar-focus); outline-offset: 2px; }
 
 @media (max-width: 430px) {

@@ -50,6 +50,22 @@ class InterfaceContractTests(unittest.TestCase):
         self.assertEqual(radar_post_body_limit("/api/ai-tips/import"), 16384)
         self.assertIsNone(radar_post_body_limit("/api/ai-tips/unknown/deep/path"))
 
+    def test_http_router_exposes_shared_provider_profiles(self) -> None:
+        radar = MagicMock()
+        radar.schema_error.return_value = None
+        radar.provider_profiles.return_value = {
+            "schema_version": "1.0",
+            "providers": [{"slug": "openrouter"}],
+            "integrations": [{"slug": "openrouter", "templates": {"codex": "..."}}],
+        }
+
+        response = route_radar_get(
+            radar, "/api/ai-resources/providers", ""
+        )
+
+        self.assertEqual(response.status, 200)
+        self.assertEqual(response.payload["providers"][0]["slug"], "openrouter")
+
     def test_installed_asset_resolver_rejects_path_traversal(self) -> None:
         asset = resolve_dashboard_asset("/ai-resources.html")
         self.assertIsNotNone(asset)

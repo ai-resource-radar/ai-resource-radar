@@ -40,8 +40,9 @@ uvx ai-resource-radar start --open
 For the hosted snapshot, use [Live Radar](https://ai-resource-radar.github.io/ai-resource-radar/) or fetch
 the documented [public data manifest](https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json).
 The public site is an aggregate view; always follow an official source before relying on an offer.
-Its v0.6.1 snapshot uses the same resource cards and formatting as the local Dashboard while
-remaining static and read-only; Pages binds each build to a fresh 23-source refresh and Git commit.
+Its v0.7.0 snapshot adds crawlable Chinese and English provider pages, conservative copyable
+integration examples, and on-demand catalogue loading while remaining static and read-only. Pages
+binds each build to a fresh 23-source refresh and Git commit.
 
 ## What you get
 
@@ -54,6 +55,7 @@ This project turns public source material into a small, explainable local databa
 | Free GPU and grants | GPU time or credit, eligibility, expiry, limitations, and a direct official link |
 | Token price leaderboard | Input/output/cached prices normalized per 1M tokens, with sorting and filters |
 | GPU price leaderboard | On-demand GPU prices normalized per hour for practical comparison |
+| Provider profiles | 20 bilingual official pages with free policy, prices, evidence, and verified integrations |
 | Change detection | New offers, quota or restriction changes, removals, and upcoming expiry |
 | Daily poster | Three free resources plus one token and one GPU price, drawn as one image and checked by local OCR |
 | AI efficiency tips | Official guidance and manual articles stay pending until a human approves safe AGENTS.md application |

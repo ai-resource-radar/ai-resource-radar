@@ -40,4 +40,4 @@ body:
     id: version
     attributes:
       label: Radar version
-      placeholder: 0.6.1
+      placeholder: 0.7.0

@@ -111,6 +111,7 @@ export function mountDashboard({ viewModules = {} } = {}) {
   const state = {
     currentView: route.view,
     comparedPrices: new Map(),
+    providerProfiles: new Map(),
     tipFilters: {
       status: route.filters.tip_status || "",
       category: route.filters.tip_category || "",
@@ -246,6 +247,22 @@ export function mountDashboard({ viewModules = {} } = {}) {
   const dialogController = installDialog(dom.dialog, dom.closeDialogButton, dom.detailRoot);
   const dialogActions = createDialogActions({ dialog: dom.dialog, detailRoot: dom.detailRoot, dialogController, ctx });
   Object.assign(ctx, dialogActions, { dialog: dom.dialog, dialogController });
+
+  async function loadProviderProfiles() {
+    try {
+      const payload = await fetchJson("/api/ai-resources/providers");
+      const integrations = new Map((payload.integrations || []).map((row) => [row.slug, row]));
+      (payload.providers || []).forEach((profile) => {
+        const combined = { ...profile, integration: integrations.get(profile.slug) || null };
+        [profile.name, profile.provider, profile.slug, ...(profile.aliases || [])]
+          .filter(Boolean)
+          .forEach((name) => state.providerProfiles.set(String(name).toLowerCase(), combined));
+      });
+    } catch {
+      // Optional examples must never block the private resource dashboard.
+      state.providerProfiles.clear();
+    }
+  }
 
   function viewRegistry() {
     return viewModules;
@@ -475,5 +492,5 @@ export function mountDashboard({ viewModules = {} } = {}) {
   window.addEventListener("hashchange", restoreRoute);
   window.addEventListener("popstate", restoreRoute);
 
-  Promise.all([registryRecommended(), Promise.resolve(loadCurrentView())]);
+  Promise.all([loadProviderProfiles(), registryRecommended(), Promise.resolve(loadCurrentView())]);
 }

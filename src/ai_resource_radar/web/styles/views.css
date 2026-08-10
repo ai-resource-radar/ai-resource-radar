@@ -1062,3 +1062,9 @@
   white-space: nowrap;
   border: 0;
 }
+.integration-disclosure { margin-top: 18px; padding: 14px; border: 1px solid var(--radar-border); border-radius: var(--radar-radius-sm); }
+.integration-disclosure > summary { min-height: 44px; color: var(--radar-green-dark); cursor: pointer; font-weight: 800; }
+.integration-snippet { margin-top: 12px; }
+.integration-snippet-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.integration-snippet-heading button { min-height: 40px; padding: 7px 12px; color: #fff; background: var(--radar-green); border: 0; border-radius: 9px; cursor: pointer; }
+.integration-snippet pre { max-height: 320px; padding: 14px; overflow: auto; color: #dff7e7; background: #0b2318; border-radius: 12px; font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }

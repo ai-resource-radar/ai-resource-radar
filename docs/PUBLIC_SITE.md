@@ -5,6 +5,7 @@ The public site is a static, read-only view of the latest **AI Resource Radar** 
 - Live site: <https://ai-resource-radar.github.io/ai-resource-radar/>
 - Machine-readable data: <https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json>
 - Builder: `ai-radar site build --database PATH --output DIR --base-url URL`
+- Provider pages: `/zh/providers/<slug>/` and `/en/providers/<slug>/`
 
 The repository's Pages workflow runs the deterministic, keyless refresh at 00:20 UTC each day and
 after every push to `main`. Both paths force all 23 registered sources even when a CI-only SQLite
@@ -17,13 +18,14 @@ cache carries last trusted values between runs; it is not a user database and is
 
 ```json
 {
-  "schema_version": "1.1",
+  "schema_version": "1.2",
   "dataset": "ai-resource-radar-public",
-  "package_version": "0.6.1",
+  "package_version": "0.7.0",
   "source_revision": "0123456789abcdef",
   "refresh_mode": "forced",
   "refresh_started_at": "2026-01-01T00:24:00Z",
   "data_age_seconds": 120,
+  "analytics_provider": "none",
   "status": "healthy",
   "generated_at": "2026-01-01T00:27:00Z",
   "radar_refreshed_at": "2026-01-01T00:25:00Z",
@@ -31,7 +33,9 @@ cache carries last trusted values between runs; it is not a user database and is
   "source_health": {},
   "files": [
     "data/resources.json", "data/token-prices.json", "data/gpu-prices.json",
-    "data/changes.json", "data/summary.json", "data/source-health.json"
+    "data/changes.json", "data/summary.json", "data/source-health.json",
+    "data/featured.json", "data/important-changes.json",
+    "data/providers.json", "data/integrations.json"
   ],
   "file_hashes": {},
   "file_bytes": {}
@@ -61,6 +65,10 @@ from `manifest.files` rather than assuming a future badge name:
 | `data/changes.json` (+ `.csv`) | Bounded recent additions, removals, quota/price/restriction changes, source ID, and event time. |
 | `data/summary.json` | Counts, update times, category totals, and the values needed for the public overview. |
 | `data/source-health.json` | Per-source status, last successful observation, and bounded error code; never raw response data. |
+| `data/featured.json` | A compact, deterministic set of official A/B no-card resources for the first viewport. |
+| `data/important-changes.json` | At most five high-signal removals, quota/restriction changes, or expiry events. |
+| `data/providers.json` | Twenty canonical official-provider profiles, stable slugs, official URLs, protocol capabilities, and bilingual page URLs. |
+| `data/integrations.json` | Conservative environment-variable-only templates and the official protocol/client evidence used to enable them. |
 | `data/badges/*.json` | Small generated status/count badges; each badge is derived from the manifest and is not an endorsement. |
 
 Clients should ignore unknown fields and use `schema_version` and `dataset` to decide whether a
@@ -75,18 +83,36 @@ account data, local filesystem paths, SQLite files, raw fetched pages, full requ
 or poster-generation output. Source excerpts are bounded and are omitted from the public export
 when they could identify a user. The local dashboard remains loopback-only.
 
-The site has no login, form, analytics tracker, or remote script dependency. A consumer should
-treat every offer as time-sensitive and follow the official URL before signing up or spending
-money.
+The site has no login or data-submission form. Local builds default to `--analytics-provider none`
+and contain no remote script. Production Pages uses `--analytics-provider cloudflare` only when the
+repository variable `CLOUDFLARE_WEB_ANALYTICS_TOKEN` is present. The build then adds one Cloudflare
+Web Analytics beacon per page and a narrowly matching CSP. It uses no cookies, local storage,
+fingerprinting, user IDs, custom events, search/filter text, keys, or account data. If the beacon is
+blocked, all radar content and navigation continue to work. Cloudflare supplies aggregate page
+path, referrer, device/browser, country, and performance dimensions and retains the aggregate data
+under its Web Analytics policy.
+
+The landing page fetches only the manifest, summary, source health, featured resources, and bounded
+important changes. Full resources and price datasets load when the corresponding view is opened and
+are cached for the current browser session. Existing full JSON/CSV URLs remain stable for machine
+consumers. A consumer should still treat every offer as time-sensitive and follow the official URL
+before signing up or spending money.
+
+Every official provider profile is pre-rendered as crawlable HTML in Chinese and English. Critical
+policy, price, evidence, and integration content does not depend on JavaScript. Community discovery
+sources do not receive official provider profiles. Correction links open a public GitHub Issue with
+bounded public facts only; users must remove any private account evidence before submitting.
 
 ## Pages publication and failure policy
 
 The workflow installs the package, restores only the CI SQLite snapshot, force-refreshes every
 allow-listed source, and runs `site build` with both the repository revision and refresh report. It
-verifies a non-empty `index.html` and `data/manifest.json`, an exact 23-source attempt set, data age
+also requires the public Cloudflare site token before building production Pages. It verifies a
+non-empty `index.html` and `data/manifest.json`, an exact 23-source attempt set, data age
 of at most 30 minutes, no `stale`/`never` source, and a matching Git revision. It then accepts only
-`healthy` or `partial` manifests. The artifact is uploaded and deployed in a separate Pages job, so
-a build or gate failure cannot replace the last deployed site.
+`healthy` or `partial` manifests, provider/integration datasets, representative bilingual provider
+pages, and exactly one analytics beacon in the root page. The artifact is uploaded and deployed in
+a separate Pages job, so a build or gate failure cannot replace the last deployed site.
 
 One source failure is represented as `partial`; the parser keeps that source's last trusted value
 and records its health while other sources continue. A schema error, missing required output, or
