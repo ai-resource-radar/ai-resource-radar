@@ -3,6 +3,14 @@ import unittest
 
 
 class ReleaseWorkflowTests(unittest.TestCase):
+    def test_generated_poster_ignore_does_not_hide_source_package(self) -> None:
+        root = Path(__file__).parents[1]
+        ignore = (root / ".gitignore").read_text(encoding="utf-8")
+
+        self.assertIn("/posters/", ignore.splitlines())
+        self.assertNotIn("posters/", ignore.splitlines())
+        self.assertTrue((root / "src/ai_resource_radar/posters/service.py").is_file())
+
     def test_publish_waits_for_core_macos_and_secret_gates(self) -> None:
         workflow = (
             Path(__file__).parents[1] / ".github/workflows/release.yml"
