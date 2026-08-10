@@ -5,17 +5,21 @@ from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from ai_resource_radar.store import SCHEMA_VERSION, connect
 from ai_resource_radar.tips import (
     MANAGED_BEGIN,
     OFFICIAL_TIP_SOURCES,
     add_tip,
+    approve_tip_batch,
     get_tip,
     list_tip_applications,
+    list_tip_application_batches,
     list_tips,
     refresh_official_tips,
     review_tip,
+    rollback_tip_batch,
     rollback_tip_application,
     seed_initial_tips,
 )
@@ -62,6 +66,7 @@ class TipsTests(unittest.TestCase):
                 ).fetchall()
             }
             self.assertTrue({"tips", "tip_evidence", "tip_changes", "tip_applications"} <= tables)
+            self.assertTrue({"tip_application_batches", "poster_model_benchmarks", "poster_model_reviews"} <= tables)
         finally:
             migrated.close()
 
@@ -233,6 +238,130 @@ class TipsTests(unittest.TestCase):
         self.assertTrue(
             all(item["status"] == "not_modified" for item in not_modified["sources"])
         )
+
+    def test_not_modified_page_still_reconciles_packaged_tip_template(self) -> None:
+        source = OFFICIAL_TIP_SOURCES[0]
+        stale = add_tip(
+            self.database,
+            title=source.title,
+            category=source.category,
+            summary="旧摘要",
+            instruction="旧版结构化指令",
+            source_url=source.url,
+            source_type="official",
+            source_title=source.title,
+            risk_level="low",
+        )
+        self.assertEqual(stale["instruction"], "旧版结构化指令")
+
+        report = refresh_official_tips(
+            self.database,
+            force=True,
+            now=datetime.fromisoformat("2026-08-09T10:00:00+08:00"),
+            fetcher=lambda item, timeout: {"status": 304, "body": b""},
+        )
+        self.assertEqual(report["failed"], 0)
+        refreshed = get_tip(self.database, stale["tip_id"])
+        self.assertIsNotNone(refreshed)
+        self.assertEqual(refreshed["instruction"], source.instruction)
+
+    def _three_candidates(self) -> list[str]:
+        identifiers = [seed_initial_tips(self.database)["tip_id"]]
+        for index, category in enumerate(("prompting", "verification"), start=1):
+            identifiers.append(
+                add_tip(
+                    self.database,
+                    title=f"Batch tip {index}",
+                    category=category,
+                    summary=f"Summary {index}",
+                    instruction=f"Instruction {index}",
+                    source_url=f"https://example.com/tip-{index}",
+                    constraints=("Keep boundaries explicit.",),
+                )["tip_id"]
+            )
+        return identifiers
+
+    def test_batch_adopts_exact_sections_once_and_rolls_back_as_group(self) -> None:
+        global_target = self.home / ".codex" / "AGENTS.md"
+        project_target = self.project / "AGENTS.md"
+        global_original = (
+            "# Efficient multi-agent orchestration\n\nOld global delegation.\n\n"
+            "# Personal safety\n\nKeep global safety.\n"
+        )
+        project_original = (
+            "# Project\n\n## Product and source boundaries\n\nKeep product boundary.\n\n"
+            "## Delegation and ownership\n\nOld project delegation.\n\n"
+            "## Safety and verification\n\nKeep project safety.\n"
+        )
+        global_target.write_text(global_original, encoding="utf-8")
+        project_target.write_text(project_original, encoding="utf-8")
+        identifiers = self._three_candidates()
+
+        batch = approve_tip_batch(
+            self.database,
+            identifiers,
+            scope="both",
+            adopt_existing=True,
+            home=self.home,
+            project_root=self.project,
+        )
+        self.assertEqual(batch["status"], "applied")
+        for target in (global_target, project_target):
+            content = target.read_text(encoding="utf-8")
+            self.assertEqual(content.count(MANAGED_BEGIN), 1)
+            self.assertEqual(content.count("Radar tip id:"), 3)
+        self.assertNotIn("# Efficient multi-agent orchestration", global_target.read_text())
+        self.assertIn("# Personal safety", global_target.read_text())
+        self.assertNotIn("## Delegation and ownership", project_target.read_text())
+        self.assertIn("## Product and source boundaries", project_target.read_text())
+        self.assertIn("## Safety and verification", project_target.read_text())
+        applications = list_tip_applications(self.database)
+        self.assertEqual(len(applications), 6)
+        self.assertTrue(all(item["application_batch_id"] == batch["batch_id"] for item in applications))
+
+        rolled_back = rollback_tip_batch(
+            self.database,
+            batch["batch_id"],
+            home=self.home,
+            project_root=self.project,
+        )
+        self.assertEqual(rolled_back["status"], "rolled_back")
+        self.assertEqual(global_target.read_text(encoding="utf-8"), global_original)
+        self.assertEqual(project_target.read_text(encoding="utf-8"), project_original)
+
+    def test_batch_second_write_failure_restores_both_and_candidates(self) -> None:
+        global_target = self.home / ".codex" / "AGENTS.md"
+        project_target = self.project / "AGENTS.md"
+        global_original = global_target.read_bytes()
+        project_original = project_target.read_bytes()
+        identifiers = self._three_candidates()
+        from ai_resource_radar import tips as tips_module
+
+        real_write = tips_module._write_atomic
+        calls = 0
+
+        def fail_second(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise OSError("simulated_project_write_failure")
+            return real_write(*args, **kwargs)
+
+        with patch("ai_resource_radar.tips._write_atomic", side_effect=fail_second):
+            with self.assertRaisesRegex(OSError, "simulated_project_write_failure"):
+                approve_tip_batch(
+                    self.database,
+                    identifiers,
+                    scope="both",
+                    adopt_existing=True,
+                    home=self.home,
+                    project_root=self.project,
+                )
+        self.assertEqual(global_target.read_bytes(), global_original)
+        self.assertEqual(project_target.read_bytes(), project_original)
+        self.assertTrue(all(get_tip(self.database, tip_id)["status"] == "candidate" for tip_id in identifiers))
+        batches = list_tip_application_batches(self.database)
+        self.assertEqual((len(batches), batches[0]["status"]), (1, "failed"))
 
 
 if __name__ == "__main__":

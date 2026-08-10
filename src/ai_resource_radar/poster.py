@@ -59,6 +59,9 @@ POSTER_LAST_FAILURE_CODE_METADATA = "poster.last_failure.code"
 POSTER_LAST_FAILURE_DATE_METADATA = "poster.last_failure.date"
 POSTER_LAST_FAILURE_AT_METADATA = "poster.last_failure.at"
 POSTER_ASPECT_RATIO_TOLERANCE = 0.08
+POSTER_BENCHMARK_VERSION = "zh-poster-v1"
+POSTER_BENCHMARK_CASE_COUNT = 6
+POSTER_BENCHMARK_IMAGE_RETENTION_DAYS = 7
 
 
 def default_poster_root() -> Path:
@@ -109,6 +112,59 @@ class PosterFacts:
             "new_today_count": self.new_today_count,
             "facts": [fact.to_dict() for fact in self.facts],
         }
+
+
+def _benchmark_cases() -> tuple[tuple[str, PosterFacts], ...]:
+    providers = (
+        ("Groq", "免费模型 API", "每天 14400 次请求", "注册后创建 API Key"),
+        ("Cloudflare", "Workers AI", "每天 10000 Neurons", "创建 Worker 后调用模型"),
+        ("Modal", "GPU 免费额度", "每月 $30 credits", "注册并安装命令行工具"),
+        ("OpenRouter", "Gemma 3 4B", "$0.05 / 百万 Token", "调用前核对输入输出单价"),
+        ("Vast.ai", "RTX 4090", "$0.18 / GPU 小时", "租用前核对实例总价"),
+    )
+    variants = (
+        ("2026-08-10", 1724, 24, 2),
+        ("2026-08-11", 1731, 25, 0),
+        ("2026-08-12", 1708, 23, 7),
+        ("2026-08-13", 1740, 26, 1),
+        ("2026-08-14", 1699, 22, 5),
+        ("2026-08-15", 1752, 27, 3),
+    )
+    output: list[tuple[str, PosterFacts]] = []
+    for index, (report_date, active, tier_a, new_today) in enumerate(variants, start=1):
+        facts = tuple(
+            PosterFact(
+                kind=(
+                    "免费资源"
+                    if item_index <= 3
+                    else "Token 价格"
+                    if item_index == 4
+                    else "GPU 价格"
+                ),
+                provider=provider,
+                title=title,
+                value=value,
+                instruction=instruction,
+                source_url="https://example.invalid/benchmark",
+            )
+            for item_index, (provider, title, value, instruction) in enumerate(
+                providers, start=1
+            )
+        )
+        output.append(
+            (
+                f"case-{index}",
+                PosterFacts(
+                    report_date=report_date,
+                    refreshed_at=f"{report_date}T08:00:00+08:00",
+                    active_count=active,
+                    tier_a_count=tier_a,
+                    new_today_count=new_today,
+                    facts=facts,
+                ),
+            )
+        )
+    return tuple(output)
 
 
 @dataclass(frozen=True)
@@ -462,7 +518,7 @@ class OpenClawImageGenerator:
             root = Path(directory).resolve()
             requested_output = root / "poster.png"
             requested_size = (
-                "720x1440"
+                "864x1152"
                 if self.model.casefold() == OPENCLAW_POSTER_MODEL.casefold()
                 else request.size
             )
@@ -648,6 +704,137 @@ def _read_poster_metadata(path: Path) -> dict[str, str]:
         connection.close()
 
 
+def poster_benchmark_status(
+    path: Path,
+    *,
+    provider: str = OPENCLAW_POSTER_PROVIDER,
+    model: str = OPENCLAW_POSTER_MODEL,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    spec = get_image_model(provider, model)
+    current = (now or datetime.now().astimezone()).astimezone()
+    today = current.date().isoformat()
+    connection = connect(path)
+    try:
+        rows = connection.execute(
+            """
+            SELECT * FROM poster_model_benchmarks
+            WHERE provider = ? AND model = ? AND benchmark_version = ?
+            ORDER BY attempted_at DESC, id DESC
+            """,
+            (spec.provider, spec.model, POSTER_BENCHMARK_VERSION),
+        ).fetchall()
+        latest: dict[str, Any] = {}
+        for row in rows:
+            latest.setdefault(str(row["case_id"]), row)
+        passed = [row for row in latest.values() if row["status"] == "success"]
+        successful_dates = sorted({str(row["run_date"]) for row in passed})
+        review = connection.execute(
+            """
+            SELECT * FROM poster_model_reviews
+            WHERE provider = ? AND model = ? AND benchmark_version = ?
+            """,
+            (spec.provider, spec.model, POSTER_BENCHMARK_VERSION),
+        ).fetchone()
+        benchmark_attempts_today = int(
+            connection.execute(
+                """
+                SELECT COUNT(*) FROM poster_model_benchmarks
+                WHERE run_date = ?
+                """,
+                (today,),
+            ).fetchone()[0]
+        )
+        report = connection.execute(
+            "SELECT attempt_count FROM daily_reports WHERE report_date = ?", (today,)
+        ).fetchone()
+        daily_attempts = int(report[0]) if report else 0
+    finally:
+        connection.close()
+    ocr_passed = len(passed) == POSTER_BENCHMARK_CASE_COUNT
+    two_days_passed = len(successful_dates) >= 2
+    review_status = str(review["status"]) if review else "pending"
+    eligible = ocr_passed and two_days_passed and review_status == "approved"
+    if not ocr_passed:
+        reason = (
+            "chinese_ocr_benchmark_failed"
+            if any(row["status"] == "failed" for row in latest.values())
+            else "chinese_ocr_benchmark_required"
+        )
+    elif not two_days_passed:
+        reason = "benchmark_two_days_required"
+    elif review_status != "approved":
+        reason = "benchmark_manual_review_required"
+    else:
+        reason = None
+    attempts_today = benchmark_attempts_today + daily_attempts
+    cases = []
+    for case_id, _facts in _benchmark_cases():
+        row = latest.get(case_id)
+        cases.append(
+            {
+                "case_id": case_id,
+                "status": str(row["status"]) if row else "pending",
+                "attempted_at": row["attempted_at"] if row else None,
+                "error_code": row["error_code"] if row else None,
+                "image_path": row["image_path"] if row else None,
+            }
+        )
+    return {
+        "schema_version": "1.0",
+        "benchmark_version": POSTER_BENCHMARK_VERSION,
+        "provider": spec.provider,
+        "model": spec.model,
+        "required_cases": POSTER_BENCHMARK_CASE_COUNT,
+        "passed_cases": len(passed),
+        "successful_dates": successful_dates,
+        "two_days_passed": two_days_passed,
+        "ocr_passed": ocr_passed,
+        "manual_review_status": review_status,
+        "manual_review_at": review["reviewed_at"] if review else None,
+        "formal_poster_eligible": eligible,
+        "reason": reason,
+        "attempts_today": attempts_today,
+        "remaining_calls_today": max(
+            0, MAX_POSTER_ATTEMPTS_PER_DAY - attempts_today
+        ),
+        "cases": cases,
+    }
+
+
+def _effective_model_payload(
+    path: Path,
+    spec: ImageModelSpec,
+    *,
+    configured: bool,
+    selected: bool,
+    configuration_reason: str | None,
+) -> dict[str, Any]:
+    payload = spec.to_dict(
+        configured=configured,
+        selected=selected,
+        configuration_reason=configuration_reason,
+    )
+    if spec.eligibility_mode == "local_benchmark":
+        benchmark = poster_benchmark_status(
+            path, provider=spec.provider, model=spec.model
+        )
+        payload["formal_poster_eligible"] = benchmark["formal_poster_eligible"]
+        payload["reason"] = benchmark["reason"]
+        payload["benchmark"] = benchmark
+    return payload
+
+
+def _model_is_formal_eligible(path: Path, spec: ImageModelSpec) -> bool:
+    if spec.eligibility_mode != "local_benchmark":
+        return spec.formal_poster_eligible
+    return bool(
+        poster_benchmark_status(path, provider=spec.provider, model=spec.model)[
+            "formal_poster_eligible"
+        ]
+    )
+
+
 def _model_configuration_status(
     spec: ImageModelSpec,
     *,
@@ -693,7 +880,9 @@ def poster_configuration(
     )
     return {
         "enabled": enabled,
-        **spec.to_dict(
+        **_effective_model_payload(
+            path,
+            spec,
             configured=configured,
             selected=True,
             configuration_reason=configuration_reason,
@@ -718,7 +907,9 @@ def list_poster_models(
             openclaw_binary=openclaw_binary,
         )
         result.append(
-            spec.to_dict(
+            _effective_model_payload(
+                path,
+                spec,
                 configured=configured,
                 selected=(
                     spec.provider == selected_provider and spec.model == selected_model
@@ -742,6 +933,8 @@ def configure_poster(
     )
     selected_model = model or current.get(POSTER_MODEL_METADATA, POSTER_MODEL)
     spec = get_image_model(selected_provider, selected_model)
+    if enabled and not _model_is_formal_eligible(path, spec):
+        raise ValueError("poster_model_not_formal_eligible")
     connection = connect(path)
     try:
         values = (
@@ -1017,6 +1210,29 @@ def select_poster_facts(path: Path, *, now: datetime | None = None) -> PosterFac
     )
 
 
+def _compact_facts_for_model(facts: PosterFacts, model: str) -> PosterFacts:
+    if model.casefold() != OPENCLAW_POSTER_MODEL.casefold():
+        return facts
+    return PosterFacts(
+        report_date=facts.report_date,
+        refreshed_at=facts.refreshed_at,
+        active_count=facts.active_count,
+        tier_a_count=facts.tier_a_count,
+        new_today_count=facts.new_today_count,
+        facts=tuple(
+            PosterFact(
+                kind=fact.kind,
+                provider=_short_text(fact.provider, 18),
+                title=_short_text(fact.title, 28),
+                value=_short_text(fact.value, 36),
+                instruction=_short_text(fact.instruction, 30),
+                source_url=fact.source_url,
+            )
+            for fact in facts.facts
+        ),
+    )
+
+
 def build_poster_prompt(
     facts: PosterFacts,
     *,
@@ -1241,9 +1457,33 @@ def daily_report_status(
                 }
         finally:
             connection.close()
+    benchmark_spec = get_image_model(OPENCLAW_POSTER_PROVIDER, OPENCLAW_POSTER_MODEL)
+    if (
+        configuration.get("provider") == benchmark_spec.provider
+        and configuration.get("model") == benchmark_spec.model
+    ):
+        benchmark_configured = bool(configuration.get("configured"))
+        benchmark_configuration_reason = configuration.get("configuration_reason")
+    else:
+        # Do not make every status request spawn OpenClaw when another model is
+        # selected. Selecting CogView while disabled is explicit and cheap.
+        benchmark_configured = False
+        benchmark_configuration_reason = "poster_benchmark_model_not_selected"
+    benchmark = poster_benchmark_status(
+        path,
+        provider=benchmark_spec.provider,
+        model=benchmark_spec.model,
+    )
+    benchmark.update(
+        {
+            "configured": benchmark_configured,
+            "configuration_reason": benchmark_configuration_reason,
+        }
+    )
     return {
         "schema_version": "1.1",
         **configuration,
+        "benchmark": benchmark,
         "quality": POSTER_QUALITY,
         "max_attempts_per_day": MAX_POSTER_ATTEMPTS_PER_DAY,
         "today": report,
@@ -1394,6 +1634,17 @@ def _reserve_attempt(
     connection = connect(path)
     try:
         with connection:
+            benchmark_attempts = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM poster_model_benchmarks WHERE run_date = ?",
+                    (facts.report_date,),
+                ).fetchone()[0]
+            )
+            allowed_daily_attempts = max(
+                0, MAX_POSTER_ATTEMPTS_PER_DAY - benchmark_attempts
+            )
+            if allowed_daily_attempts == 0:
+                return None
             connection.execute(
                 """
                 INSERT INTO daily_reports(
@@ -1449,7 +1700,7 @@ def _reserve_attempt(
                     prompt_hash,
                     at,
                     facts.report_date,
-                    MAX_POSTER_ATTEMPTS_PER_DAY,
+                    allowed_daily_attempts,
                 ),
             )
             if cursor.rowcount != 1:
@@ -1586,7 +1837,12 @@ def _record_success(
         connection.close()
 
 
-def _save_webp(source: Path, target: Path) -> tuple[str, int]:
+def _save_webp(
+    source: Path,
+    target: Path,
+    *,
+    strict_aspect: bool = False,
+) -> tuple[str, int]:
     try:
         from PIL import Image, ImageOps
     except ImportError as exc:
@@ -1595,12 +1851,24 @@ def _save_webp(source: Path, target: Path) -> tuple[str, int]:
     try:
         with Image.open(source) as image:
             image.load()
-            normalized = ImageOps.fit(
-                image.convert("RGB"),
-                (POSTER_WIDTH, POSTER_HEIGHT),
-                method=Image.Resampling.LANCZOS,
-                centering=(0.5, 0.5),
-            )
+            rgb = image.convert("RGB")
+            if strict_aspect:
+                # CogView's official 864x1152 canvas is already 3:4.  Keep the
+                # entire model output and only scale it; never crop, pad, or
+                # stretch a benchmark-qualified daily poster.
+                if rgb.width * POSTER_HEIGHT != rgb.height * POSTER_WIDTH:
+                    raise RuntimeError("poster_image_aspect_ratio_invalid")
+                normalized = rgb.resize(
+                    (POSTER_WIDTH, POSTER_HEIGHT),
+                    resample=Image.Resampling.LANCZOS,
+                )
+            else:
+                normalized = ImageOps.fit(
+                    rgb,
+                    (POSTER_WIDTH, POSTER_HEIGHT),
+                    method=Image.Resampling.LANCZOS,
+                    centering=(0.5, 0.5),
+                )
             normalized.save(temporary, format="WEBP", quality=90, method=6)
         body = temporary.read_bytes()
         if not body:
@@ -1623,6 +1891,266 @@ def _safe_error(exc: Exception) -> str:
     if re.fullmatch(r"[a-z0-9_]{3,80}", value):
         return value
     return "poster_generation_failed"
+
+
+def prune_poster_benchmarks(
+    path: Path,
+    *,
+    poster_root: Path | None = None,
+    now: datetime | None = None,
+) -> int:
+    root = (poster_root or default_poster_root()).resolve()
+    cutoff = (
+        (now or datetime.now().astimezone())
+        - timedelta(days=POSTER_BENCHMARK_IMAGE_RETENTION_DAYS)
+    ).isoformat(timespec="seconds")
+    connection = connect(path)
+    try:
+        rows = connection.execute(
+            """
+            SELECT id, image_path FROM poster_model_benchmarks
+            WHERE attempted_at < ? AND image_path IS NOT NULL
+            """,
+            (cutoff,),
+        ).fetchall()
+        removed = 0
+        with connection:
+            for row in rows:
+                candidate = (root / str(row["image_path"])).resolve()
+                if candidate.is_relative_to(root):
+                    candidate.unlink(missing_ok=True)
+                connection.execute(
+                    "UPDATE poster_model_benchmarks SET image_path = NULL WHERE id = ?",
+                    (row["id"],),
+                )
+                removed += 1
+        return removed
+    finally:
+        connection.close()
+
+
+def run_poster_benchmark(
+    path: Path,
+    *,
+    provider: str = OPENCLAW_POSTER_PROVIDER,
+    model: str = OPENCLAW_POSTER_MODEL,
+    cases: int = 3,
+    now: datetime | None = None,
+    poster_root: Path | None = None,
+    generator: PosterGenerator | None = None,
+    ocr: OCRProvider | None = None,
+    openclaw_binary: str | Path | None = None,
+) -> dict[str, Any]:
+    if not 1 <= cases <= MAX_POSTER_ATTEMPTS_PER_DAY:
+        raise ValueError("invalid_poster_benchmark_case_count")
+    spec = get_image_model(provider, model)
+    if spec.eligibility_mode != "local_benchmark" or spec.requires_api_key:
+        raise ValueError("poster_model_benchmark_not_supported")
+    current = (now or datetime.now().astimezone()).astimezone()
+    with operation_lock(path, "poster"):
+        before = poster_benchmark_status(
+            path, provider=spec.provider, model=spec.model, now=current
+        )
+        remaining = int(before["remaining_calls_today"])
+        if remaining <= 0:
+            raise RuntimeError("poster_daily_attempt_limit")
+        image_generator = generator
+        if image_generator is None:
+            configured, reason = _model_configuration_status(
+                spec, openclaw_binary=openclaw_binary
+            )
+            if not configured:
+                raise RuntimeError(reason or "poster_model_not_configured")
+            image_generator = create_poster_generator(spec.provider, spec.model)
+        if (
+            image_generator.provider != spec.provider
+            or image_generator.model != spec.model
+        ):
+            raise ValueError("poster_test_generator_mismatch")
+        ocr_provider = ocr or MacOSVisionOCR()
+        root = (poster_root or default_poster_root()).resolve()
+        benchmark_root = root / "benchmarks"
+        benchmark_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        os.chmod(benchmark_root, 0o700)
+        prune_poster_benchmarks(path, poster_root=root, now=current)
+        passed_ids = {
+            str(item["case_id"])
+            for item in before["cases"]
+            if item["status"] == "success"
+        }
+        pending = [
+            (case_id, facts)
+            for case_id, facts in _benchmark_cases()
+            if case_id not in passed_ids
+        ]
+        selected = pending[: min(cases, remaining)]
+        results: list[dict[str, Any]] = []
+        for case_id, facts in selected:
+            attempted_at = datetime.now().astimezone().isoformat(timespec="seconds")
+            candidate: Path | None = None
+            normalized: Path | None = None
+            target: Path | None = None
+            validation: PosterValidation | None = None
+            detected: DetectedImage | None = None
+            image_hash: str | None = None
+            error_code: str | None = None
+            try:
+                generated = image_generator.generate(
+                    PosterRequest(
+                        prompt=build_poster_prompt(facts),
+                        size="864x1152",
+                    ),
+                    api_key=None,
+                )
+                detected = _detect_image(
+                    generated.body, require_poster_ratio=True
+                )
+                descriptor, candidate_name = tempfile.mkstemp(
+                    prefix=f".{case_id}-",
+                    suffix=detected.suffix,
+                    dir=benchmark_root,
+                )
+                candidate = Path(candidate_name)
+                with os.fdopen(descriptor, "wb") as stream:
+                    stream.write(generated.body)
+                os.chmod(candidate, 0o600)
+                normalized_descriptor, normalized_name = tempfile.mkstemp(
+                    prefix=f".{case_id}-final-",
+                    suffix=".webp",
+                    dir=benchmark_root,
+                )
+                os.close(normalized_descriptor)
+                normalized = Path(normalized_name)
+                normalized.unlink(missing_ok=True)
+                image_hash, _image_bytes = _save_webp(
+                    candidate,
+                    normalized,
+                    strict_aspect=True,
+                )
+                recognized = ocr_provider.recognize(normalized)
+                validation = validate_poster_text(recognized, facts)
+                if not validation.valid:
+                    raise RuntimeError("poster_validation_failed")
+                target = (
+                    benchmark_root
+                    / f"{POSTER_BENCHMARK_VERSION}-{case_id}-{image_hash}.webp"
+                )
+                os.replace(normalized, target)
+                normalized = None
+                status = "success"
+            except Exception as exc:
+                status = "failed"
+                error_code = _safe_error(exc)
+            finally:
+                if candidate is not None:
+                    candidate.unlink(missing_ok=True)
+                if normalized is not None:
+                    normalized.unlink(missing_ok=True)
+                if status == "failed" and target is not None:
+                    target.unlink(missing_ok=True)
+            connection = connect(path)
+            try:
+                with connection:
+                    connection.execute(
+                        """
+                        INSERT INTO poster_model_benchmarks(
+                            benchmark_version, provider, model, case_id,
+                            run_date, attempted_at, status, media_type, width,
+                            height, final_image_sha256, validation_json,
+                            image_path, error_code
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            POSTER_BENCHMARK_VERSION,
+                            spec.provider,
+                            spec.model,
+                            case_id,
+                            current.date().isoformat(),
+                            attempted_at,
+                            status,
+                            detected.media_type if detected else None,
+                            POSTER_WIDTH if status == "success" else None,
+                            POSTER_HEIGHT if status == "success" else None,
+                            image_hash if status == "success" else None,
+                            json.dumps(
+                                validation.to_dict() if validation else {},
+                                ensure_ascii=False,
+                                separators=(",", ":"),
+                            ),
+                            str(target.relative_to(root))
+                            if status == "success" and target is not None
+                            else None,
+                            error_code,
+                        ),
+                    )
+            finally:
+                connection.close()
+            results.append(
+                {
+                    "case_id": case_id,
+                    "status": status,
+                    "error_code": error_code,
+                    "image_path": str(target) if status == "success" and target else None,
+                }
+            )
+        return {
+            "schema_version": "1.0",
+            "results": results,
+            "benchmark": poster_benchmark_status(
+                path, provider=spec.provider, model=spec.model, now=current
+            ),
+        }
+
+
+def review_poster_benchmark(
+    path: Path,
+    *,
+    provider: str = OPENCLAW_POSTER_PROVIDER,
+    model: str = OPENCLAW_POSTER_MODEL,
+    approve: bool,
+    notes: str = "",
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    spec = get_image_model(provider, model)
+    if spec.eligibility_mode != "local_benchmark":
+        raise ValueError("poster_model_benchmark_not_supported")
+    current = (now or datetime.now().astimezone()).astimezone()
+    before = poster_benchmark_status(
+        path, provider=spec.provider, model=spec.model, now=current
+    )
+    if approve and not (
+        before["ocr_passed"] and before["two_days_passed"]
+    ):
+        raise ValueError("poster_benchmark_incomplete")
+    clean_notes = " ".join(str(notes).split())[:500]
+    connection = connect(path)
+    try:
+        with connection:
+            connection.execute(
+                """
+                INSERT INTO poster_model_reviews(
+                    provider, model, benchmark_version, status, reviewed_at,
+                    notes
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(provider, model, benchmark_version) DO UPDATE SET
+                    status = excluded.status,
+                    reviewed_at = excluded.reviewed_at,
+                    notes = excluded.notes
+                """,
+                (
+                    spec.provider,
+                    spec.model,
+                    POSTER_BENCHMARK_VERSION,
+                    "approved" if approve else "rejected",
+                    current.isoformat(timespec="seconds"),
+                    clean_notes,
+                ),
+            )
+    finally:
+        connection.close()
+    return poster_benchmark_status(
+        path, provider=spec.provider, model=spec.model, now=current
+    )
 
 
 def prune_daily_posters(
@@ -1780,7 +2308,7 @@ def _generate_daily_poster_unlocked(
                 error_code="poster_model_unsupported",
             )
 
-    if model_spec is not None and not model_spec.formal_poster_eligible:
+    if model_spec is not None and not _model_is_formal_eligible(path, model_spec):
         _upsert_failure(
             path,
             report_date=report_date,
@@ -1841,6 +2369,7 @@ def _generate_daily_poster_unlocked(
 
     try:
         facts = select_poster_facts(path, now=current)
+        facts = _compact_facts_for_model(facts, selected_model)
     except Exception as exc:
         error_code = _safe_error(exc)
         _upsert_failure(
@@ -1916,7 +2445,11 @@ def _generate_daily_poster_unlocked(
             os.close(normalized_descriptor)
             normalized = Path(normalized_name)
             normalized.unlink(missing_ok=True)
-            image_hash, image_bytes = _save_webp(candidate, normalized)
+            image_hash, image_bytes = _save_webp(
+                candidate,
+                normalized,
+                strict_aspect=(selected_model == OPENCLAW_POSTER_MODEL),
+            )
             recognized = ocr_provider.recognize(normalized)
             validation = validate_poster_text(recognized, facts)
             if not validation.valid:

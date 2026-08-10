@@ -982,7 +982,11 @@ function posterStatusLabel(report) {
 
 function posterReasonLabel(reason) {
   return {
+    chinese_ocr_benchmark_required: "需要完成 6 组中文 OCR 基准",
     chinese_ocr_benchmark_failed: "中文 OCR 基准未通过",
+    benchmark_two_days_required: "6 组样例必须跨至少两个自然日完成",
+    benchmark_manual_review_required: "等待人工确认版式无重影、裁切和错位",
+    poster_benchmark_model_not_selected: "先选择 CogView 基准模型（可保持日报关闭）",
     openai_keychain_credential_missing: "Keychain 中没有 OpenAI 凭据",
     openclaw_unavailable: "未找到 OpenClaw",
     openclaw_provider_status_unavailable: "无法读取 OpenClaw 图片供应商状态",
@@ -990,6 +994,106 @@ function posterReasonLabel(reason) {
     "openclaw_model_cogview-3-flash_not_configured": "OpenClaw 未启用 CogView-3-Flash",
     poster_model_unsupported: "当前运行版本不支持所选模型",
   }[reason] || reason || "无";
+}
+
+async function startPosterBenchmark() {
+  refreshState.hidden = false;
+  refreshState.textContent = "正在生成免费基准海报并校验最终 WebP…";
+  try {
+    await fetchJson("/api/ai-daily/benchmark", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cases: 3 }),
+    });
+    pollPosterBenchmark();
+  } catch (error) {
+    refreshState.textContent = error.message === "poster_benchmark_already_running"
+      ? "海报基准任务已经在运行。"
+      : "无法启动海报基准。";
+  }
+}
+
+async function pollPosterBenchmark() {
+  try {
+    const status = await fetchJson("/api/ai-daily/status");
+    if (status.benchmark_task?.status === "running") {
+      refreshState.hidden = false;
+      refreshState.textContent = "CogView 正在生成，完成后会检查 MIME、3:4 比例、OCR 和数字白名单…";
+      window.setTimeout(pollPosterBenchmark, 1500);
+      return;
+    }
+    refreshState.hidden = false;
+    refreshState.textContent = status.benchmark_task?.status === "completed"
+      ? "本轮基准完成。"
+      : `基准未通过：${posterReasonLabel(status.benchmark_task?.error)}`;
+    loadPoster();
+  } catch {
+    refreshState.hidden = false;
+    refreshState.textContent = "无法读取海报基准状态。";
+  }
+}
+
+async function approvePosterBenchmark() {
+  if (!window.confirm("我已逐张确认 6 张最终 WebP 无明显重影、裁切或错位，允许该模型用于正式日报。")) return;
+  refreshState.hidden = false;
+  refreshState.textContent = "正在记录人工审核…";
+  try {
+    await fetchJson("/api/ai-daily/benchmark/review", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ approve: true, notes: "Dashboard 人工确认无明显重影、裁切或错位。" }),
+    });
+    refreshState.textContent = "人工审核已通过；现在可以启用免费日报模型。";
+    loadPoster();
+  } catch (error) {
+    refreshState.textContent = `无法批准基准：${posterReasonLabel(error.message)}`;
+  }
+}
+
+function posterBenchmarkPanel(status) {
+  const benchmark = status.benchmark;
+  if (!benchmark) return null;
+  const panel = element("section", "poster-benchmark");
+  const heading = element("div", "poster-benchmark-heading");
+  const copy = element("div");
+  copy.append(
+    element("span", "poster-kicker", `LOCAL BENCHMARK · ${benchmark.benchmark_version}`),
+    element("h3", "", `中文准确性 ${benchmark.passed_cases} / ${benchmark.required_cases}`),
+    element("p", "", posterReasonLabel(benchmark.reason)),
+  );
+  const actions = element("div", "poster-benchmark-actions");
+  const run = element("button", "poster-generate", "运行下一批");
+  run.type = "button";
+  run.disabled = !benchmark.configured
+    || benchmark.remaining_calls_today <= 0
+    || benchmark.passed_cases >= benchmark.required_cases
+    || status.benchmark_task?.status === "running";
+  run.title = !benchmark.configured
+    ? posterReasonLabel(benchmark.configuration_reason)
+    : `今天剩余 ${benchmark.remaining_calls_today} 次免费调用`;
+  run.addEventListener("click", startPosterBenchmark);
+  const approve = element("button", "poster-download", "人工确认通过");
+  approve.type = "button";
+  approve.disabled = !benchmark.ocr_passed
+    || !benchmark.two_days_passed
+    || benchmark.manual_review_status === "approved";
+  approve.addEventListener("click", approvePosterBenchmark);
+  actions.append(run, approve);
+  heading.append(copy, actions);
+  const cases = element("div", "poster-benchmark-cases");
+  benchmark.cases.forEach((item) => {
+    cases.append(element(
+      "span",
+      item.status === "success" ? "poster-ok" : "poster-warn",
+      `${item.case_id} · ${item.status === "success" ? "OCR 通过" : item.status === "failed" ? "未通过" : "待运行"}`,
+    ));
+  });
+  panel.append(
+    heading,
+    element("p", "poster-benchmark-budget", `今日图片调用：${benchmark.attempts_today} / 3；基准与日报共用硬上限。`),
+    cases,
+  );
+  return panel;
 }
 
 function posterMeta(publishedReport, status, todayReport) {
@@ -1107,6 +1211,8 @@ async function loadPoster() {
     generate.addEventListener("click", () => startPoster(status.today?.status === "success"));
     stageHeading.append(copy, generate);
     stage.append(stageHeading, posterMeta(latest, status, status.today));
+    const benchmarkPanel = posterBenchmarkPanel(status);
+    if (benchmarkPanel) stage.append(benchmarkPanel);
     if (latest?.image_url) {
       const frame = element("div", "poster-frame");
       const image = element("img");

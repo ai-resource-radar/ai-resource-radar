@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0 — 2026-08-10
+
+- Expand the deterministic registry from 15 to 23 sources with official SambaNova, Mistral,
+  Hugging Face Inference, SiliconFlow, Alibaba Model Studio, Cerebras, Replicate, and Baseten adapters.
+- Add official Token and GPU pricing rows for Replicate and Baseten, including normalized per-million
+  Token and per-hour GPU units.
+- Add schema v7 transactional tip-application batches, exact adoption of two legacy delegation
+  sections, one backup set, audit records, failure restoration, and whole-batch rollback.
+- Add a six-case, two-day CogView-3-Flash Chinese poster benchmark with a shared three-call daily
+  budget, final-WebP OCR/numeric validation, and a mandatory human review gate.
+- Request the official `864×1152` CogView portrait size and proportionally convert it to
+  `1080×1440` WebP without adding or redrawing text.
+- Add benchmark CLI/API/Dashboard controls while keeping the free poster disabled until every gate passes.
+
 ## 0.3.0 — 2026-08-10
 
 - Add an approval-gated AI efficiency tips library with official Codex discovery and manual imports.

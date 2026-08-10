@@ -98,14 +98,14 @@ compiles and tests the Vision OCR and menu bar helpers.
 
 ## What it tracks
 
-The built-in adapters currently cover 15 sources:
+The built-in adapters currently cover 23 sources:
 
 | Category | Sources | Cadence |
 | --- | --- | --- |
-| Free token/API and image generation | OpenRouter, Groq, Gemini, Cloudflare Workers AI, Zhipu CogView-3-Flash | Daily |
+| Free token/API and image generation | OpenRouter, Groq, Gemini, Cloudflare Workers AI, Zhipu CogView-3-Flash, SambaNova, Mistral, Hugging Face Inference, SiliconFlow, Alibaba Model Studio, Cerebras | Daily |
 | Free GPU and credits | Hugging Face ZeroGPU, Modal, Lightning AI, Kaggle, Google Colab | Daily |
-| GPU market prices | Modal, RunPod, Lambda GPU Cloud, Vast.ai | Daily |
-| Token price baseline | `pydantic/genai-prices` | Daily |
+| GPU market prices | Modal, RunPod, Lambda GPU Cloud, Vast.ai, Replicate, Baseten | Daily |
+| Token prices | Replicate, Baseten, plus the `pydantic/genai-prices` baseline | Daily |
 | Community discovery | `mnfst/awesome-free-llm-apis` | Weekly |
 
 Community sources can discover candidates but cannot upgrade an offer to “officially verified”.
@@ -143,21 +143,20 @@ provider, value, action, statistic, update time, and unexpected number.
 
 ```bash
 ai-radar poster models
-ai-radar poster configure --provider openai --model gpt-image-2 --enable
-ai-radar poster key set
-ai-radar poster generate
+ai-radar poster configure --provider openclaw --model zai/cogview-3-flash --disable
+ai-radar poster benchmark status
+ai-radar poster benchmark              # up to three cases per day
+ai-radar poster benchmark review --approve
+ai-radar poster configure --provider openclaw --model zai/cogview-3-flash --enable
 ai-radar poster latest
-# Explicit one-call smoke for the keyless, non-formal ZAI model:
-ai-radar poster test-model --provider openclaw --model zai/cogview-3-flash --output ./zai-smoke.png
 ```
 
-The OpenAI key is entered with a hidden prompt and stored only in macOS Keychain. GPT Image 2
-requires paid API access. All automatic and manual formal-poster generations share a hard limit of
-three image calls per day. The explicit model smoke is restricted to keyless, non-formal models and
-never publishes a daily poster. If every candidate fails OCR, nothing is published and the last
-valid poster stays visible. OpenClaw image models can be discovered and tested through the same registry. A model is
-not eligible for the automatic Chinese daily poster until it passes the OCR benchmark; in v0.3,
-`zai/cogview-3-flash` is intentionally marked test-only for this reason.
+The free `zai/cogview-3-flash` model is called through OpenClaw at its official `864×1152` portrait
+size and then proportionally resized to a final `1080×1440` WebP. Benchmark and daily generation
+share a hard limit of three image calls per day. Formal eligibility requires all six OCR and numeric
+allow-list cases across at least two calendar days, followed by a human check for ghosting, cropping,
+and layout errors. Until then the poster stays disabled; the system does not fall back to a paid
+OpenAI image call and radar refreshes continue normally.
 
 ### AI efficiency tips
 
@@ -211,7 +210,7 @@ Run `ai-radar <command> --help` for every filter and option.
 
 ## Data, privacy, and storage
 
-- SQLite schema v6 uses file mode `0600`; no secrets, cookies, or account data are stored.
+- SQLite schema v7 uses file mode `0600`; no secrets, cookies, or account data are stored.
 - Tips retain only bounded summaries and evidence. Approval updates only the marked AGENTS.md managed block and creates a private backup under `~/.codex/backups/ai-tips/`.
 - Full fetched pages are parsed in memory and are not archived.
 - Fetch logs are retained for 90 days; ordinary changes and delivered notifications for 365 days.

@@ -97,14 +97,14 @@ Vision OCR 与菜单栏 Helper。
 
 ## 当前追踪范围
 
-内置适配器目前覆盖 15 个来源：
+内置适配器目前覆盖 23 个来源：
 
 | 类别 | 来源 | 周期 |
 | --- | --- | --- |
-| 免费 Token/API 与生图 | OpenRouter、Groq、Gemini、Cloudflare Workers AI、智谱 CogView-3-Flash | 每日 |
+| 免费 Token/API 与生图 | OpenRouter、Groq、Gemini、Cloudflare Workers AI、智谱 CogView-3-Flash、SambaNova、Mistral、Hugging Face Inference、SiliconFlow、阿里云百炼、Cerebras | 每日 |
 | 免费 GPU 与 credits | Hugging Face ZeroGPU、Modal、Lightning AI、Kaggle、Google Colab | 每日 |
-| GPU 市场价格 | Modal、RunPod、Lambda GPU Cloud、Vast.ai | 每日 |
-| Token 价格基线 | `pydantic/genai-prices` | 每日 |
+| GPU 市场价格 | Modal、RunPod、Lambda GPU Cloud、Vast.ai、Replicate、Baseten | 每日 |
+| Token 价格 | Replicate、Baseten，以及 `pydantic/genai-prices` 基线 | 每日 |
 | 社区线索发现 | `mnfst/awesome-free-llm-apis` | 每周 |
 
 社区目录只能发现候选，不能把资源升级为“官方已核验”。所有 HTTPS 来源都经过白名单限制，
@@ -139,18 +139,18 @@ Vision OCR 与菜单栏 Helper。
 
 ```bash
 ai-radar poster models
-ai-radar poster configure --provider openai --model gpt-image-2 --enable
-ai-radar poster key set
-ai-radar poster generate
+ai-radar poster configure --provider openclaw --model zai/cogview-3-flash --disable
+ai-radar poster benchmark status
+ai-radar poster benchmark              # 每天最多运行 3 组
+ai-radar poster benchmark review --approve
+ai-radar poster configure --provider openclaw --model zai/cogview-3-flash --enable
 ai-radar poster latest
-# 对无密钥、非正式模型显式执行一次能力 smoke：
-ai-radar poster test-model --provider openclaw --model zai/cogview-3-flash --output ./zai-smoke.png
 ```
 
-OpenAI Key 通过隐藏输入写入 macOS 钥匙串。GPT Image 2 需要付费 API 访问；自动与手动的正式海报生成
-共享每天最多 3 次图片调用的硬上限。显式模型 smoke 仅允许无密钥、非正式模型，且不会发布日报。
-三次 OCR 都不通过时，当日不会发布，Dashboard 会继续展示上一张有效海报。OpenClaw 图片模型会进入同一个模型注册表供发现和手动测试；只有通过中文 OCR
-基准的模型才允许进入自动日报。v0.3 中 `zai/cogview-3-flash` 明确标记为仅测试，不会被每日任务调用。
+`zai/cogview-3-flash` 通过 OpenClaw 使用官方免费的图片模型，先以 `864×1152` 生成，再等比缩放为
+`1080×1440` WebP。基准与日报共享每天最多 3 次图片调用的硬上限；必须在至少两个自然日内完成
+6/6 OCR 与数字白名单检查，并由人逐张确认无重影、裁切和错位后，才能启用正式日报。未达标时
+继续保持关闭，不会回退调用付费 OpenAI 图片 API，也不会阻塞雷达刷新。
 
 ### AI 效率技巧
 
@@ -202,15 +202,17 @@ ai-radar tips list --status candidate
 ai-radar tips refresh
 ai-radar tips import --url https://example.com/tip --title "标题" --category context --summary "摘要" --instruction "具体做法"
 ai-radar tips approve <tip-id> --scope global
+ai-radar tips approve-batch <tip-id-1> <tip-id-2> <tip-id-3> --scope both --adopt-existing
 ai-radar tips applications
 ai-radar tips rollback <application-id>
+ai-radar tips rollback-batch <batch-id>
 ```
 
 执行 `ai-radar <命令> --help` 可以查看全部筛选参数。
 
 ## 数据、隐私与存储
 
-- SQLite schema v6，数据库权限为 `0600`，不保存密钥、Cookie 或账号信息。
+- SQLite schema v7，数据库权限为 `0600`，不保存密钥、Cookie 或账号信息。
 - 效率技巧只保存短摘要和必要证据；全部需要人工批准。批准后仅更新带标记的 AGENTS.md 受管区块，并在 `~/.codex/backups/ai-tips/` 创建私有备份。
 - 完整网页只在内存中解析，不会作为历史网页归档。
 - 抓取日志保留 90 天，普通变化和已送达通知保留 365 天。

@@ -1,4 +1,20 @@
-# Migrating to v0.2
+# Migrating installed services
+
+## v0.3 to v0.4
+
+Stop or reinstall the service with the host-specific installer so it can create the normal online
+backup before the first v0.4 open. Schema v6 migrates to v7 transactionally. Existing resources,
+source caches, evidence, changes, notifications, daily reports, and tips are retained; the new
+objects only add tip application batches and poster benchmark/review audit.
+
+CogView remains disabled after upgrade. Run `ai-radar poster benchmark` on at least two natural
+days, confirm 6/6 final-WebP OCR results, then run `ai-radar poster benchmark review --approve`.
+Only after that gate can `poster configure --provider openclaw --model zai/cogview-3-flash --enable`
+succeed. v0.4 never falls back to a paid OpenAI image request.
+
+The initial three delegation tips can be adopted atomically with `tips approve-batch ... --scope
+both --adopt-existing`. That command removes only the two documented legacy delegation sections,
+creates private backups, and records a batch ID for whole-group rollback.
 
 ## Standalone v0.1 users
 

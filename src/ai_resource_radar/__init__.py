@@ -1,6 +1,6 @@
 """Stable public facade for the deterministic AI Resource Radar core."""
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 from ai_resource_radar.doctor import DoctorCheck, DoctorReport, diagnose, run_doctor
 from ai_resource_radar.locks import (
@@ -24,8 +24,11 @@ from ai_resource_radar.poster import (
     latest_daily_report,
     list_daily_reports,
     list_poster_models,
+    poster_benchmark_status,
     poster_configuration,
+    review_poster_benchmark,
     resolve_daily_poster,
+    run_poster_benchmark,
     test_poster_model,
 )
 from ai_resource_radar.pricing import list_gpu_prices, list_token_prices
@@ -50,12 +53,15 @@ from ai_resource_radar.tips import (
     OFFICIAL_TIP_SOURCES,
     TIP_CATEGORIES,
     add_tip,
+    approve_tip_batch,
     get_tip,
     list_tip_applications,
+    list_tip_application_batches,
     list_tips,
     prune_tips,
     refresh_official_tips,
     review_tip,
+    rollback_tip_batch,
     rollback_tip_application,
     seed_initial_tips,
     tips_summary,
@@ -94,10 +100,12 @@ __all__ = [
     "list_offers",
     "list_token_prices",
     "list_poster_models",
+    "poster_benchmark_status",
     "normalize_modalities",
     "operation_lock",
     "operation_lock_status",
     "poster_configuration",
+    "review_poster_benchmark",
     "radar_summary",
     "refresh",
     "resolve_modalities",
@@ -106,15 +114,19 @@ __all__ = [
     "summary",
     "test_poster_model",
     "resolve_daily_poster",
+    "run_poster_benchmark",
     "OFFICIAL_TIP_SOURCES",
     "TIP_CATEGORIES",
     "add_tip",
+    "approve_tip_batch",
     "get_tip",
     "list_tip_applications",
+    "list_tip_application_batches",
     "list_tips",
     "prune_tips",
     "refresh_official_tips",
     "review_tip",
+    "rollback_tip_batch",
     "rollback_tip_application",
     "seed_initial_tips",
     "tips_summary",

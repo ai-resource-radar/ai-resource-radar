@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 from ai_resource_radar.dashboard import create_server
 from ai_resource_radar.locks import operation_lock
+from ai_resource_radar.store import SCHEMA_VERSION
 
 
 class DashboardTests(unittest.TestCase):
@@ -70,6 +71,9 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(daily_status["model"], "gpt-image-2")
         self.assertFalse(daily_status["configured"])
         self.assertTrue(daily_status["formal_poster_eligible"])
+        self.assertEqual(daily_status["benchmark"]["benchmark_version"], "zh-poster-v1")
+        self.assertEqual(daily_status["benchmark"]["passed_cases"], 0)
+        self.assertEqual(daily_status["benchmark"]["remaining_calls_today"], 3)
 
         status, _, body = self.request("GET", "/api/ai-daily?days=0")
         self.assertEqual(status, 400)
@@ -136,6 +140,41 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(status, 409)
         self.assertEqual(json.loads(body)["error"], "daily_poster_already_running")
 
+    def test_benchmark_api_validates_budget_and_manual_review(self) -> None:
+        status, _, body = self.request(
+            "POST",
+            "/api/ai-daily/benchmark",
+            body=b'{"cases":4}',
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertEqual(status, 400)
+        self.assertEqual(json.loads(body)["error"], "invalid_poster_benchmark_request")
+
+        with patch.object(self.server.radar, "start_poster_benchmark", return_value={"task": "running"}) as start:
+            status, _, _ = self.request(
+                "POST",
+                "/api/ai-daily/benchmark",
+                body=b'{"cases":2}',
+                headers={"Content-Type": "application/json"},
+            )
+        self.assertEqual(status, 202)
+        start.assert_called_once_with(cases=2)
+
+        with patch.object(
+            self.server.radar,
+            "review_poster_benchmark",
+            return_value={"formal_poster_eligible": True},
+        ) as review:
+            status, _, body = self.request(
+                "POST",
+                "/api/ai-daily/benchmark/review",
+                body=json.dumps({"approve": True, "notes": "人工检查通过"}).encode(),
+                headers={"Content-Type": "application/json"},
+            )
+        self.assertEqual(status, 200)
+        self.assertTrue(json.loads(body)["formal_poster_eligible"])
+        review.assert_called_once_with(approve=True, notes="人工检查通过")
+
     def test_newer_database_schema_returns_structured_503(self) -> None:
         database = self.server.radar.path
         connection = sqlite3.connect(database)
@@ -149,7 +188,7 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(status, 503)
         self.assertEqual(payload["error"], "ai_radar_schema_unsupported")
         self.assertEqual(payload["database_schema_version"], 99)
-        self.assertEqual(payload["runtime_supported_schema_version"], 6)
+        self.assertEqual(payload["runtime_supported_schema_version"], SCHEMA_VERSION)
 
         status, _, body = self.request(
             "POST",

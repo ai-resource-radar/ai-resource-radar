@@ -31,7 +31,7 @@ class RadarServer(ThreadingHTTPServer):
 
 
 class RadarHandler(BaseHTTPRequestHandler):
-    server_version = "AIResourceRadar/0.3"
+    server_version = "AIResourceRadar/0.4"
     sys_version = ""
     server: RadarServer
 
@@ -279,6 +279,17 @@ class RadarHandler(BaseHTTPRequestHandler):
         if path == "/api/ai-daily/status":
             self._json(200, self.server.radar.poster_status())
             return
+        if path == "/api/ai-daily/benchmark":
+            status = self.server.radar.poster_status()
+            self._json(
+                200,
+                {
+                    "schema_version": "1.0",
+                    "benchmark": status.get("benchmark"),
+                    "task": status.get("benchmark_task"),
+                },
+            )
+            return
         parts = path.strip("/").split("/")
         if (
             len(parts) == 4
@@ -327,6 +338,8 @@ class RadarHandler(BaseHTTPRequestHandler):
             path not in {
                 "/api/ai-resources/refresh",
                 "/api/ai-daily/generate",
+                "/api/ai-daily/benchmark",
+                "/api/ai-daily/benchmark/review",
                 "/api/ai-tips/import",
                 "/api/ai-tips/refresh",
             }
@@ -369,6 +382,34 @@ class RadarHandler(BaseHTTPRequestHandler):
                 self._json(409, {"error": "daily_poster_already_running"})
             else:
                 self._json(202, state)
+            return
+        if path == "/api/ai-daily/benchmark":
+            cases = payload.get("cases", 3) if isinstance(payload, dict) else 3
+            if isinstance(cases, bool) or not isinstance(cases, int) or not 1 <= cases <= 3:
+                self._json(400, {"error": "invalid_poster_benchmark_request"})
+                return
+            state = self.server.radar.start_poster_benchmark(cases=cases)
+            if state is None:
+                self._json(409, {"error": "poster_benchmark_already_running"})
+            else:
+                self._json(202, state)
+            return
+        if path == "/api/ai-daily/benchmark/review":
+            if not isinstance(payload, dict) or not isinstance(payload.get("approve"), bool):
+                self._json(400, {"error": "invalid_poster_benchmark_review"})
+                return
+            notes = payload.get("notes", "")
+            if not isinstance(notes, str):
+                self._json(400, {"error": "invalid_poster_benchmark_review"})
+                return
+            try:
+                result = self.server.radar.review_poster_benchmark(
+                    approve=payload["approve"], notes=notes
+                )
+            except ValueError as exc:
+                self._json(400, {"error": str(exc)})
+                return
+            self._json(200, result)
             return
         if path == "/api/ai-tips/import":
             if not isinstance(payload, dict):

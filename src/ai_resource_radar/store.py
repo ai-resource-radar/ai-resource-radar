@@ -18,7 +18,7 @@ from ai_resource_radar.sources import (
 )
 
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 FETCH_RUN_RETENTION_DAYS = 90
 CHANGE_RETENTION_DAYS = 365
 NOTIFICATION_RETENTION_DAYS = 365
@@ -208,6 +208,85 @@ def connect(path: Path) -> sqlite3.Connection:
             force=True,
         )
     return connection
+
+
+def _create_v7_schema(connection: sqlite3.Connection) -> None:
+    """Create schema-v7 objects inside the caller's migration transaction."""
+
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS tip_application_batches (
+            batch_id TEXT PRIMARY KEY,
+            scope TEXT NOT NULL CHECK(scope IN ('global', 'project', 'both')),
+            tip_ids_json TEXT NOT NULL,
+            targets_json TEXT NOT NULL DEFAULT '[]',
+            removed_sections_json TEXT NOT NULL DEFAULT '[]',
+            status TEXT NOT NULL DEFAULT 'applied'
+                CHECK(status IN ('applied', 'failed', 'rolled_back')),
+            error_code TEXT,
+            applied_at TEXT NOT NULL,
+            rolled_back_at TEXT
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS tip_application_batches_time
+            ON tip_application_batches(applied_at DESC)
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS poster_model_benchmarks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            benchmark_version TEXT NOT NULL,
+            provider TEXT NOT NULL,
+            model TEXT NOT NULL,
+            case_id TEXT NOT NULL,
+            run_date TEXT NOT NULL,
+            attempted_at TEXT NOT NULL,
+            status TEXT NOT NULL CHECK(status IN ('success', 'failed')),
+            media_type TEXT,
+            width INTEGER,
+            height INTEGER,
+            final_image_sha256 TEXT,
+            validation_json TEXT NOT NULL DEFAULT '{}',
+            image_path TEXT,
+            error_code TEXT
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS poster_model_benchmarks_lookup
+            ON poster_model_benchmarks(
+                provider, model, benchmark_version, case_id, attempted_at DESC
+            )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS poster_model_reviews (
+            provider TEXT NOT NULL,
+            model TEXT NOT NULL,
+            benchmark_version TEXT NOT NULL,
+            status TEXT NOT NULL CHECK(status IN ('approved', 'rejected')),
+            reviewed_at TEXT NOT NULL,
+            notes TEXT NOT NULL DEFAULT '',
+            PRIMARY KEY(provider, model, benchmark_version)
+        )
+        """
+    )
+    if "application_batch_id" not in _columns(connection, "tip_applications"):
+        connection.execute(
+            "ALTER TABLE tip_applications ADD COLUMN application_batch_id TEXT"
+        )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS tip_applications_batch
+            ON tip_applications(application_batch_id, applied_at DESC)
+        """
+    )
 
 
 def _initialize(connection: sqlite3.Connection) -> bool:
@@ -447,13 +526,19 @@ def _initialize(connection: sqlite3.Connection) -> bool:
         )
     history_migration = 0 < previous_version < 3
     schema_migration = 0 < previous_version < SCHEMA_VERSION
+    needs_v7_schema = previous_version < 7
     if (
-        schema_migration or history_migration or needs_modality_backfill
+        schema_migration
+        or history_migration
+        or needs_modality_backfill
+        or needs_v7_schema
     ) and not connection.in_transaction:
         connection.execute("BEGIN IMMEDIATE")
     with connection:
+        if needs_v7_schema:
+            _create_v7_schema(connection)
         # ALTER, backfill, metadata and user_version form the transactional
-        # v4 -> v5 migration. SQLite rolls the whole block back on failure.
+        # schema migration. SQLite rolls the whole block back on failure.
         for name, declaration in (
             ("input_modalities_json", "TEXT NOT NULL DEFAULT '[]'"),
             ("output_modalities_json", "TEXT NOT NULL DEFAULT '[]'"),

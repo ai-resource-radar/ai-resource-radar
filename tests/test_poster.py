@@ -41,7 +41,7 @@ from ai_resource_radar.poster import (
     test_poster_model,
     validate_poster_text,
 )
-from ai_resource_radar.store import connect
+from ai_resource_radar.store import SCHEMA_VERSION, connect
 
 
 NOW = datetime(2026, 7, 30, 8, 15, tzinfo=timezone.utc)
@@ -319,12 +319,29 @@ class PosterTests(unittest.TestCase):
                 "zai-smoke.png",
             ]
         )
+        benchmark = cli_parser().parse_args(
+            ["poster", "benchmark", "status"]
+        )
+        tip_batch = cli_parser().parse_args(
+            [
+                "tips",
+                "approve-batch",
+                "tip-a",
+                "tip-b",
+                "--scope",
+                "both",
+                "--adopt-existing",
+            ]
+        )
 
         self.assertTrue(doctor.json)
         self.assertEqual(configure.poster_action, "configure")
         self.assertTrue(configure.enable)
         self.assertEqual(generate.model, "gpt-image-2")
         self.assertEqual(model_test.poster_action, "test-model")
+        self.assertEqual(benchmark.benchmark_action, "status")
+        self.assertEqual(tip_batch.tip_ids, ["tip-a", "tip-b"])
+        self.assertTrue(tip_batch.adopt_existing)
 
     def test_cli_returns_structured_error_for_newer_schema(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -340,7 +357,7 @@ class PosterTests(unittest.TestCase):
         self.assertEqual(exit_code, 2)
         self.assertEqual(payload["error"], "ai_radar_schema_unsupported")
         self.assertEqual(payload["database_schema_version"], 99)
-        self.assertEqual(payload["runtime_supported_schema_version"], 6)
+        self.assertEqual(payload["runtime_supported_schema_version"], SCHEMA_VERSION)
 
     def test_cli_forwards_free_image_generation_filter(self) -> None:
         output = StringIO()
@@ -373,8 +390,11 @@ class PosterTests(unittest.TestCase):
         buffer = BytesIO()
         image.save(buffer, format="JPEG")
 
+        seen_command = []
+
         def run(command, **kwargs):
             del kwargs
+            seen_command.extend(command)
             output = Path(command[command.index("--output") + 1])
             output.write_bytes(buffer.getvalue())
             payload = {
@@ -397,6 +417,7 @@ class PosterTests(unittest.TestCase):
 
         self.assertEqual(generated.media_type, "image/jpeg")
         self.assertEqual((generated.width, generated.height), (720, 1440))
+        self.assertEqual(seen_command[seen_command.index("--size") + 1], "864x1152")
 
     def test_openai_adapter_sends_medium_portrait_request_and_reads_base64(self) -> None:
         encoded = base64.b64encode(b"image-bytes").decode()
@@ -699,7 +720,7 @@ class PosterTests(unittest.TestCase):
             path = Path(temp) / "radar.sqlite3"
             configuration = configure_poster(
                 path,
-                enabled=True,
+                enabled=False,
                 provider="openclaw",
                 model="zai/cogview-3-flash",
             )
@@ -716,12 +737,12 @@ class PosterTests(unittest.TestCase):
             )
 
         self.assertTrue(configuration["configured"])
-        self.assertTrue(status["enabled"])
+        self.assertFalse(status["enabled"])
         self.assertTrue(status["configured"])
         self.assertEqual(status["provider"], "openclaw")
         self.assertEqual(status["model"], "zai/cogview-3-flash")
         self.assertFalse(status["formal_poster_eligible"])
-        self.assertEqual(status["reason"], "chinese_ocr_benchmark_failed")
+        self.assertEqual(status["reason"], "chinese_ocr_benchmark_required")
         self.assertEqual(len(models), 2)
         self.assertEqual(sum(bool(item["selected"]) for item in models), 1)
 
@@ -742,7 +763,7 @@ class PosterTests(unittest.TestCase):
             path = Path(temp) / "radar.sqlite3"
             configure_poster(
                 path,
-                enabled=True,
+                enabled=False,
                 provider="openclaw",
                 model="zai/cogview-3-flash",
             )
@@ -902,7 +923,7 @@ class PosterTests(unittest.TestCase):
             finally:
                 migrated.close()
 
-            self.assertEqual(version, 6)
+            self.assertEqual(version, SCHEMA_VERSION)
         self.assertEqual(notification_count, 1)
         self.assertEqual(daily_table, 1)
 

@@ -18,6 +18,9 @@ from ai_resource_radar.poster import (
     latest_daily_report,
     list_daily_reports,
     list_poster_models,
+    poster_benchmark_status,
+    review_poster_benchmark,
+    run_poster_benchmark,
     test_poster_model,
 )
 from ai_resource_radar.locks import OperationLockedError
@@ -33,11 +36,14 @@ from ai_resource_radar.store import (
 from ai_resource_radar.tips import (
     TIP_CATEGORIES,
     add_tip,
+    approve_tip_batch,
     get_tip,
     list_tip_applications,
+    list_tip_application_batches,
     list_tips,
     refresh_official_tips,
     review_tip,
+    rollback_tip_batch,
     rollback_tip_application,
     seed_initial_tips,
 )
@@ -103,6 +109,11 @@ def _parser() -> argparse.ArgumentParser:
     tip_approve.add_argument("tip_id")
     tip_approve.add_argument("--database", type=Path, default=default_database_path())
     tip_approve.add_argument("--scope", required=True, choices=("global", "project", "both"))
+    tip_approve_batch = tip_actions.add_parser("approve-batch", help="事务性批准并应用一组技巧")
+    tip_approve_batch.add_argument("tip_ids", nargs="+")
+    tip_approve_batch.add_argument("--database", type=Path, default=default_database_path())
+    tip_approve_batch.add_argument("--scope", required=True, choices=("global", "project", "both"))
+    tip_approve_batch.add_argument("--adopt-existing", action="store_true")
     tip_reject = tip_actions.add_parser("reject", help="拒绝候选技巧")
     tip_reject.add_argument("tip_id")
     tip_reject.add_argument("--database", type=Path, default=default_database_path())
@@ -110,9 +121,15 @@ def _parser() -> argparse.ArgumentParser:
     tip_apps = tip_actions.add_parser("applications", help="查看规则应用记录")
     tip_apps.add_argument("--database", type=Path, default=default_database_path())
     tip_apps.add_argument("--limit", type=int, default=100)
+    tip_batches = tip_actions.add_parser("batches", help="查看技巧应用批次")
+    tip_batches.add_argument("--database", type=Path, default=default_database_path())
+    tip_batches.add_argument("--limit", type=int, default=100)
     tip_rollback = tip_actions.add_parser("rollback", help="恢复应用前的 AGENTS.md")
     tip_rollback.add_argument("application_id", type=int)
     tip_rollback.add_argument("--database", type=Path, default=default_database_path())
+    tip_rollback_batch = tip_actions.add_parser("rollback-batch", help="整组恢复应用前的 AGENTS.md")
+    tip_rollback_batch.add_argument("batch_id")
+    tip_rollback_batch.add_argument("--database", type=Path, default=default_database_path())
     tip_refresh = tip_actions.add_parser("refresh", help="核验官方技巧来源")
     tip_refresh.add_argument("--database", type=Path, default=default_database_path())
     tip_refresh.add_argument("--force", action="store_true")
@@ -144,6 +161,16 @@ def _parser() -> argparse.ArgumentParser:
     model_test.add_argument("--provider", required=True, choices=("openclaw",))
     model_test.add_argument("--model", required=True)
     model_test.add_argument("--output", required=True, type=Path)
+    benchmark = poster_actions.add_parser("benchmark", help="运行或查看本机中文海报基准")
+    benchmark.add_argument("benchmark_action", nargs="?", choices=("status", "review"), default="run")
+    benchmark.add_argument("--database", type=Path, default=default_database_path())
+    benchmark.add_argument("--provider", choices=("openclaw",))
+    benchmark.add_argument("--model")
+    benchmark.add_argument("--cases", type=int, default=3)
+    benchmark_review = benchmark.add_mutually_exclusive_group()
+    benchmark_review.add_argument("--approve", action="store_true")
+    benchmark_review.add_argument("--reject", action="store_true")
+    benchmark.add_argument("--notes", default="")
     latest = poster_actions.add_parser("latest")
     latest.add_argument("--database", type=Path, default=default_database_path())
     history = poster_actions.add_parser("list")
@@ -311,6 +338,16 @@ def main(argv: list[str] | None = None) -> int:
                     )
                 )
                 return 0
+            if args.tips_action == "approve-batch":
+                _print(
+                    approve_tip_batch(
+                        args.database,
+                        args.tip_ids,
+                        scope=args.scope,
+                        adopt_existing=args.adopt_existing,
+                    )
+                )
+                return 0
             if args.tips_action == "reject":
                 _print(
                     review_tip(
@@ -325,8 +362,15 @@ def main(argv: list[str] | None = None) -> int:
                 applications = list_tip_applications(args.database, limit=args.limit)
                 _print({"schema_version": "1.0", "applications": applications})
                 return 0
+            if args.tips_action == "batches":
+                batches = list_tip_application_batches(args.database, limit=args.limit)
+                _print({"schema_version": "1.0", "batches": batches})
+                return 0
             if args.tips_action == "rollback":
                 _print(rollback_tip_application(args.database, args.application_id))
+                return 0
+            if args.tips_action == "rollback-batch":
+                _print(rollback_tip_batch(args.database, args.batch_id))
                 return 0
             report = refresh_official_tips(
                 args.database, force=args.force, timeout=args.timeout
@@ -408,11 +452,11 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"{item['provider']}/{item['model']} · {' · '.join(flags)}")
             return 0
         if args.poster_action == "configure":
-            if args.enable and (not args.provider or not args.model):
+            if (args.provider is None) != (args.model is None):
                 print("poster_provider_and_model_required", file=sys.stderr)
                 return 2
-            if args.disable and (args.provider or args.model):
-                print("poster_disable_does_not_accept_model", file=sys.stderr)
+            if args.enable and (not args.provider or not args.model):
+                print("poster_provider_and_model_required", file=sys.stderr)
                 return 2
             try:
                 payload = configure_poster(
@@ -439,6 +483,44 @@ def main(argv: list[str] | None = None) -> int:
                 print(str(exc), file=sys.stderr)
                 return 2
             except RuntimeError as exc:
+                print(str(exc), file=sys.stderr)
+                return 1
+            _print(payload)
+            return 0
+        if args.poster_action == "benchmark":
+            model_args = {}
+            if args.provider:
+                model_args["provider"] = args.provider
+            if args.model:
+                model_args["model"] = args.model
+            try:
+                if args.benchmark_action == "status":
+                    payload = poster_benchmark_status(args.database, **model_args)
+                elif args.benchmark_action == "review":
+                    if args.approve == args.reject:
+                        print("poster_benchmark_review_decision_required", file=sys.stderr)
+                        return 2
+                    payload = review_poster_benchmark(
+                        args.database,
+                        approve=args.approve,
+                        notes=args.notes,
+                        **model_args,
+                    )
+                else:
+                    if args.approve or args.reject:
+                        print("poster_benchmark_review_action_required", file=sys.stderr)
+                        return 2
+                    payload = run_poster_benchmark(
+                        args.database,
+                        cases=args.cases,
+                        **model_args,
+                    )
+            except UnsupportedSchemaError as exc:
+                return _schema_failure(exc)
+            except ValueError as exc:
+                print(str(exc), file=sys.stderr)
+                return 2
+            except (RuntimeError, OperationLockedError) as exc:
                 print(str(exc), file=sys.stderr)
                 return 1
             _print(payload)

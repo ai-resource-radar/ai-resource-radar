@@ -14,6 +14,7 @@ class ImageModelSpec:
     capabilities: dict[str, Any]
     formal_poster_eligible: bool
     reason: str | None = None
+    eligibility_mode: str = "static"
 
     def to_dict(
         self,
@@ -31,6 +32,7 @@ class ImageModelSpec:
             "selected": selected,
             "formal_poster_eligible": self.formal_poster_eligible,
             "reason": self.reason,
+            "eligibility_mode": self.eligibility_mode,
         }
 
 
@@ -58,13 +60,22 @@ OPENCLAW_ZAI_COGVIEW_3_FLASH = ImageModelSpec(
         "image_generation": True,
         "input_modalities": ["text"],
         "output_modalities": ["image"],
-        "sizes": ["720x1440", "1024x1024", "1440x720"],
+        "sizes": [
+            "1024x1024",
+            "768x1344",
+            "864x1152",
+            "1344x768",
+            "1152x864",
+            "1440x720",
+            "720x1440",
+        ],
         "formats": ["jpeg", "png"],
         "transport": "openclaw",
         "upstream_provider": "zai",
     },
     formal_poster_eligible=False,
-    reason="chinese_ocr_benchmark_failed",
+    reason="chinese_ocr_benchmark_required",
+    eligibility_mode="local_benchmark",
 )
 
 

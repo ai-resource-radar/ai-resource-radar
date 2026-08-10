@@ -20,7 +20,10 @@ from ai_resource_radar.poster import (
     generate_daily_poster,
     latest_daily_report,
     list_daily_reports,
+    poster_benchmark_status,
+    review_poster_benchmark,
     resolve_daily_poster,
+    run_poster_benchmark,
 )
 from ai_resource_radar.store import (
     SCHEMA_VERSION,
@@ -57,6 +60,15 @@ class AiRadarDashboard:
         }
     )
     _poster_state: dict[str, Any] = field(
+        default_factory=lambda: {
+            "status": "idle",
+            "started_at": None,
+            "finished_at": None,
+            "report": None,
+            "error": None,
+        }
+    )
+    _benchmark_state: dict[str, Any] = field(
         default_factory=lambda: {
             "status": "idle",
             "started_at": None,
@@ -171,7 +183,65 @@ class AiRadarDashboard:
     def poster_status(self) -> dict[str, Any]:
         with self._lock:
             task = dict(self._poster_state)
-        return {**daily_report_status(self.path), "task": task}
+            benchmark_task = dict(self._benchmark_state)
+        return {
+            **daily_report_status(self.path),
+            "task": task,
+            "benchmark_task": benchmark_task,
+        }
+
+    def start_poster_benchmark(self, *, cases: int = 3) -> dict[str, Any] | None:
+        with self._lock:
+            if self._benchmark_state["status"] == "running" or bool(
+                operation_lock_status(self.path, "poster")["locked"]
+            ):
+                return None
+            started = datetime.now().astimezone().isoformat(timespec="seconds")
+            self._benchmark_state = {
+                "status": "running",
+                "started_at": started,
+                "finished_at": None,
+                "report": None,
+                "error": None,
+            }
+        Thread(target=self._run_poster_benchmark, args=(cases,), daemon=True).start()
+        return self.poster_status()
+
+    def _run_poster_benchmark(self, cases: int) -> None:
+        try:
+            payload = run_poster_benchmark(
+                self.path,
+                cases=cases,
+                poster_root=self.poster_root,
+            )
+            status = "completed"
+            error = None
+        except (OperationLockedError, RuntimeError, ValueError) as exc:
+            payload = None
+            status = "failed"
+            error = str(exc)
+        except Exception:
+            payload = None
+            status = "failed"
+            error = "poster_benchmark_failed"
+        finished = datetime.now().astimezone().isoformat(timespec="seconds")
+        with self._lock:
+            self._benchmark_state = {
+                "status": status,
+                "started_at": self._benchmark_state["started_at"],
+                "finished_at": finished,
+                "report": payload,
+                "error": error,
+            }
+
+    def review_poster_benchmark(
+        self, *, approve: bool, notes: str = ""
+    ) -> dict[str, Any]:
+        return review_poster_benchmark(
+            self.path,
+            approve=approve,
+            notes=notes,
+        )
 
     def start_poster(self, *, force: bool = False) -> dict[str, Any] | None:
         with self._lock:
