@@ -12,6 +12,7 @@ from typing import Any
 
 from ai_resource_radar.model_registry import get_image_model
 from ai_resource_radar.store import POSTER_RETENTION_DAYS, connect
+from ai_resource_radar.feature_flags import poster_feature_status, poster_generation_available
 
 from .constants import *  # noqa: F401,F403
 from .facts import PosterFacts, default_poster_root
@@ -149,9 +150,11 @@ def daily_report_status(
             "configuration_reason": benchmark_configuration_reason,
         }
     )
+    feature_fields = {} if poster_generation_available() else poster_feature_status()
     return {
         "schema_version": "1.1",
         **configuration,
+        **feature_fields,
         "benchmark": benchmark,
         "quality": POSTER_QUALITY,
         "max_attempts_per_day": MAX_POSTER_ATTEMPTS_PER_DAY,

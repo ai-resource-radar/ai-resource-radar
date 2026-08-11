@@ -29,7 +29,7 @@ class RadarServer(ThreadingHTTPServer):
 
 
 class RadarHandler(BaseHTTPRequestHandler):
-    server_version = "AIResourceRadar/0.6"
+    server_version = "AIResourceRadar/0.7.1"
     sys_version = ""
     server: RadarServer
 

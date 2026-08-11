@@ -7,6 +7,7 @@ from typing import Any, Iterable, Mapping
 import re
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
+from ai_resource_radar import __version__ as RADAR_PUBLIC_VERSION
 from ai_resource_radar.provider_profiles import ProviderProfile, provider_for_record
 
 
@@ -92,7 +93,7 @@ def correction_report_url(
         f"\nDisplayed fact: {displayed or 'provider profile'}"
         f"\nOfficial source: {source or 'not available'}"
         f"\nLast verified: {verified or 'not available'}"
-        f"\nRadar version/revision: 0.7.0 / {source_revision[:64]}"
+        f"\nRadar version/revision: {RADAR_PUBLIC_VERSION} / {source_revision[:64]}"
         "\n\nWhat is outdated or incorrect?\n"
         "\nPublic evidence for the correction:\n"
     )[:MAX_REPORT_BODY]

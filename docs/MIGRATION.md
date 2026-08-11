@@ -1,5 +1,13 @@
 # Migrating installed services
 
+## v0.7.0 to v0.7.1
+
+This release does not change SQLite schema v7 or move any database, poster, report, or cache
+paths. The local Dashboard no longer exposes the poster view; old `#poster`, `?view=poster`, and
+`?tab=poster` links normalize to the recommended free-resources view without calling poster APIs.
+Poster backend routes and stored history remain available for compatibility. The public static site
+continues to publish only free-resource and price views.
+
 ## v0.4 to v0.6
 
 v0.6 keeps SQLite schema v7, so opening an existing database performs no data migration. The

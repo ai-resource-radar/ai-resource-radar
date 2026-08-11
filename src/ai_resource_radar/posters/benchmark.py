@@ -12,6 +12,7 @@ from typing import Any
 from ai_resource_radar.locks import operation_lock
 from ai_resource_radar.model_registry import get_image_model
 from ai_resource_radar.store import connect
+from ai_resource_radar.feature_flags import require_poster_generation
 
 from .constants import *  # noqa: F401,F403
 from .facts import _benchmark_cases, _compact_facts_for_model, build_poster_prompt, default_poster_root
@@ -77,6 +78,7 @@ def run_poster_benchmark(
     ocr: OCRProvider | None = None,
     openclaw_binary: str | Path | None = None,
 ) -> dict[str, Any]:
+    require_poster_generation()
     if not 1 <= cases <= MAX_POSTER_ATTEMPTS_PER_DAY:
         raise ValueError("invalid_poster_benchmark_case_count")
     spec = get_image_model(provider, model)
@@ -247,6 +249,7 @@ def review_poster_benchmark(
     notes: str = "",
     now: datetime | None = None,
 ) -> dict[str, Any]:
+    require_poster_generation()
     spec = get_image_model(provider, model)
     if spec.eligibility_mode != "local_benchmark":
         raise ValueError("poster_model_benchmark_not_supported")

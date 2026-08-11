@@ -5,8 +5,10 @@ on:
     branches:
       - main
   schedule:
-    # Keep the public snapshot close to the start of the UTC day.
-    - cron: "20 0 * * *"
+    # Primary refresh shortly after the UTC day starts; the later run is a
+    # fallback for a missed or unhealthy primary publication.
+    - cron: "37 0 * * *"
+    - cron: "17 3 * * *"
   workflow_dispatch:
     inputs:
       force:
@@ -28,7 +30,52 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  fallback_check:
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.check.outputs.skip }}
+      reason: ${{ steps.check.outputs.reason }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Check live fallback snapshot
+        id: check
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_SCHEDULE: ${{ github.event.schedule }}
+          FALLBACK_CRON: "17 3 * * *"
+          LIVE_MANIFEST_URL: https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json
+        run: |
+          set +e
+          skip=false
+          reason=not_fallback
+
+          if [[ "$EVENT_NAME" == "schedule" && "$EVENT_SCHEDULE" == "$FALLBACK_CRON" ]]; then
+            if curl --fail --silent --show-error --location --max-time 30 \
+              "$LIVE_MANIFEST_URL" --output live-manifest.json; then
+              if reason="$(python3 .github/scripts/pages_fallback_guard.py live-manifest.json)"; then
+                skip=true
+              else
+                [[ -n "$reason" ]] || reason=manifest_parse_failed
+              fi
+            else
+              reason=manifest_fetch_failed
+            fi
+          fi
+
+          {
+            echo "skip=$skip"
+            echo "reason=$reason"
+          } >> "$GITHUB_OUTPUT"
+          echo "fallback decision: skip=$skip reason=$reason"
+          # An unavailable, malformed, old, or unhealthy live snapshot must
+          # fall through to the normal refresh rather than fail this check.
+          exit 0
+
   build:
+    needs: fallback_check
+    if: needs.fallback_check.result == 'success' && needs.fallback_check.outputs.skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
@@ -120,6 +167,20 @@ jobs:
           if not manifest.is_file() or manifest.stat().st_size == 0:
               raise SystemExit("pages_gate_missing_manifest")
           payload = json.loads(manifest.read_text(encoding="utf-8"))
+          refresh_report_path = Path("refresh-report.json")
+          if not refresh_report_path.is_file() or refresh_report_path.stat().st_size == 0:
+              raise SystemExit("pages_gate_missing_refresh_report")
+          refresh_report = json.loads(refresh_report_path.read_text(encoding="utf-8"))
+          report_sources = refresh_report.get("sources")
+          if not isinstance(report_sources, list) or len(report_sources) != 23:
+              raise SystemExit("pages_gate_source_attempts")
+          source_ids = [
+              item.get("source_id")
+              for item in report_sources
+              if isinstance(item, dict)
+          ]
+          if len(source_ids) != 23 or len(set(source_ids)) != 23 or any(not source_id for source_id in source_ids):
+              raise SystemExit("pages_gate_source_attempts")
           status = payload.get("status")
           if status not in {"healthy", "partial"}:
               raise SystemExit(f"pages_gate_rejected_status:{status!r}")
@@ -154,7 +215,10 @@ jobs:
           path: _site
 
   deploy:
-    needs: build
+    needs:
+      - fallback_check
+      - build
+    if: needs.fallback_check.result == 'success' && needs.fallback_check.outputs.skip != 'true' && needs.build.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       pages: write

@@ -161,7 +161,7 @@ class PublicSiteTests(unittest.TestCase):
             public_text = "\n".join(path.read_text(encoding="utf-8") for path in (site / "data").rglob("*.json"))
             self.assertEqual(manifest["schema_version"], "1.2")
             self.assertEqual(manifest["dataset"], "ai-resource-radar-public")
-            self.assertEqual(manifest["package_version"], "0.7.0")
+            self.assertEqual(manifest["package_version"], "0.7.1")
             self.assertEqual(manifest["source_revision"], "local")
             self.assertEqual(manifest["refresh_mode"], "cadence")
             self.assertEqual(manifest["data_age_seconds"], 0)

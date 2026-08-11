@@ -171,7 +171,7 @@ def refresh_official_tips(
             response_etag: str | None = None
             response_last_modified: str | None = None
             if fetcher is None:
-                headers = {"Accept": "text/html", "User-Agent": "AIResourceRadar/0.6"}
+                headers = {"Accept": "text/html", "User-Agent": "AIResourceRadar/0.7.1"}
                 if cached.get("etag"):
                     headers["If-None-Match"] = cached["etag"]
                 if cached.get("last_modified"):

@@ -290,19 +290,16 @@ export function mountDashboard({ viewModules = {} } = {}) {
         ? "GPU 算力费用榜单"
         : state.currentView === "tips"
           ? "AI 效率技巧"
-          : state.currentView === "poster"
-            ? "日报海报"
-            : state.currentView === "changes"
-              ? "变化记录"
-              : state.currentView === "recommended"
-                ? "按用途浏览"
-                : `${kindLabel(state.currentView)}资源`;
+          : state.currentView === "changes"
+            ? "变化记录"
+            : state.currentView === "recommended"
+              ? "按用途浏览"
+              : `${kindLabel(state.currentView)}资源`;
   }
 
   function syncViewShell() {
     const priceView = ["token-prices", "gpu-prices"].includes(state.currentView);
     const changes = state.currentView === "changes";
-    const poster = state.currentView === "poster";
     const tips = state.currentView === "tips";
     const resourceView = ["recommended", "token", "gpu", "grant"].includes(state.currentView);
     updateHero(ctx);
@@ -310,16 +307,16 @@ export function mountDashboard({ viewModules = {} } = {}) {
     dom.viewSubnav.hidden = !(resourceView || priceView);
     dom.resourceSubnav.hidden = !resourceView;
     dom.priceSubnav.hidden = !priceView;
-    dom.freeQuickFilters.hidden = priceView || changes || poster || tips;
+    dom.freeQuickFilters.hidden = priceView || changes || tips;
     dom.heroTrust.hidden = !resourceView;
     dom.featuredSection.hidden = state.currentView !== "recommended";
-    dom.summaryRoot.hidden = priceView || changes || poster || tips;
+    dom.summaryRoot.hidden = priceView || changes || tips;
     dom.pricingControls.hidden = !priceView;
-    dom.browserGrid.classList.toggle("pricing-mode", priceView || poster || tips);
-    dom.radarSidebar.hidden = priceView || poster || tips;
-    dom.filters.hidden = changes || priceView || poster || tips || dom.filterToggle.getAttribute("aria-expanded") !== "true";
-    dom.filterToggle.hidden = changes || priceView || poster || tips;
-    dom.queryInput.disabled = changes || poster;
+    dom.browserGrid.classList.toggle("pricing-mode", priceView || tips);
+    dom.radarSidebar.hidden = priceView || tips;
+    dom.filters.hidden = changes || priceView || tips || dom.filterToggle.getAttribute("aria-expanded") !== "true";
+    dom.filterToggle.hidden = changes || priceView || tips;
+    dom.queryInput.disabled = changes;
     dom.catalogTitle.textContent = catalogLabel();
     if (priceView) configurePricingControls(ctx);
     if (state.pendingRouteFilters) {
@@ -341,7 +338,6 @@ export function mountDashboard({ viewModules = {} } = {}) {
     else if (["token", "gpu", "grant"].includes(state.currentView)) task = module?.loadResources?.(ctx);
     else if (state.currentView === "token-prices") task = module?.loadTokenPrices?.(ctx);
     else if (state.currentView === "gpu-prices") task = module?.loadGpuPrices?.(ctx);
-    else if (state.currentView === "poster") task = module?.loadPoster?.(ctx);
     else if (state.currentView === "tips") task = module?.loadTips?.(ctx);
     else if (state.currentView === "changes") task = module?.loadChanges?.(ctx);
     Promise.resolve(task).finally(() => {

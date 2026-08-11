@@ -9,6 +9,12 @@ from typing import Any
 
 from ai_resource_radar.dashboard import serve
 from ai_resource_radar.doctor import diagnose
+from ai_resource_radar import feature_flags as _feature_flags
+from ai_resource_radar.feature_flags import (
+    PosterFeaturePausedError,
+    poster_feature_error_payload,
+    poster_feature_status,
+)
 from ai_resource_radar.paths import default_database_path
 from ai_resource_radar.public_site import PublicSiteError, build_public_site
 from ai_resource_radar.poster import (
@@ -55,7 +61,7 @@ def _parser(context: CliContext | None = None) -> argparse.ArgumentParser:
     database = context.database or default_database_path()
     parser = argparse.ArgumentParser(
         prog="ai-radar",
-        description="确定性采集 AI 免费资源与价格，并可生成纯图片日报。",
+        description="确定性采集 AI 免费资源与价格，并维护本地雷达数据。",
     )
     actions = parser.add_subparsers(dest="action", required=True)
     refresh_parser = actions.add_parser("refresh", help="刷新本地资源库")
@@ -147,14 +153,16 @@ def _parser(context: CliContext | None = None) -> argparse.ArgumentParser:
     tip_refresh.add_argument("--force", action="store_true")
     tip_refresh.add_argument("--timeout", type=float, default=20)
 
-    daily = actions.add_parser("daily", help="刷新雷达并生成日报")
+    daily = actions.add_parser("daily", help="刷新雷达与官方技巧")
     daily.add_argument("--database", type=Path, default=database)
     daily.add_argument("--timeout", type=float, default=20)
     daily.add_argument("--force-refresh", action="store_true")
     daily.add_argument("--poster-provider", choices=("openai", "openclaw"))
     daily.add_argument("--output", type=Path)
 
-    poster = actions.add_parser("poster", help="管理纯图片日报")
+    # Keep direct read-only/status and migration-safe administrative invocations
+    # working, but do not advertise this paused feature in normal CLI help.
+    poster = actions.add_parser("poster", help=argparse.SUPPRESS)
     poster_actions = poster.add_subparsers(dest="poster_action", required=True)
     generate = poster_actions.add_parser("generate")
     generate.add_argument("--database", type=Path, default=database)
@@ -247,6 +255,13 @@ def _parser(context: CliContext | None = None) -> argparse.ArgumentParser:
     service.add_argument("--hour", type=int, default=8)
     service.add_argument("--minute", type=int, default=0)
     service.add_argument("--database", type=Path, default=database)
+    # ``argparse`` does not hide individual subparsers when given
+    # ``help=SUPPRESS``; remove only its help row/metavar while retaining the
+    # parser map so explicit poster read-only/status commands still work.
+    actions._choices_actions = [
+        item for item in actions._choices_actions if item.dest != "poster"
+    ]
+    actions.metavar = "{" + ",".join(item.dest for item in actions._choices_actions) + "}"
     return parser
 
 
@@ -476,11 +491,21 @@ def main(argv: list[str] | None = None, *, context: CliContext | None = None) ->
                 timeout=args.timeout,
                 force=args.force_refresh,
             )
-            poster = generate_daily_poster(
-                args.database,
-                poster_root=context.poster_root,
-                provider=args.poster_provider,
-            )
+            if _feature_flags.POSTER_GENERATION_AVAILABLE:
+                poster = generate_daily_poster(
+                    args.database,
+                    poster_root=context.poster_root,
+                    provider=args.poster_provider,
+                )
+            else:
+                # The daily job still refreshes deterministic radar/tips data,
+                # but must never enter the provider/OCR poster pipeline while
+                # the feature gate is paused.
+                poster = {
+                    "schema_version": "1.1",
+                    "status": "paused",
+                    **poster_feature_status(),
+                }
             poster_status = daily_report_status(args.database)
         except UnsupportedSchemaError as exc:
             return _schema_failure(exc)
@@ -500,9 +525,21 @@ def main(argv: list[str] | None = None, *, context: CliContext | None = None) ->
         # Individual source failures are isolated and recorded in the report;
         # they must not make the scheduled daily job look crashed. A configured
         # poster failure remains a real daily-job failure.
-        return 0 if poster.get("status") in {"success", "disabled"} else 1
+        return 0 if (
+            poster.get("status") in {"success", "disabled", "paused"}
+            or poster.get("reason") == "poster_feature_paused"
+        ) else 1
     if args.action == "poster":
         if args.poster_action == "key":
+            if args.key_action == "set" and not _feature_flags.POSTER_GENERATION_AVAILABLE:
+                print(
+                    json.dumps(
+                        poster_feature_error_payload(schema_version="1.1"),
+                        ensure_ascii=False,
+                    ),
+                    file=sys.stderr,
+                )
+                return 1
             store = KeychainStore()
             if args.key_action == "set":
                 try:
@@ -554,6 +591,9 @@ def main(argv: list[str] | None = None, *, context: CliContext | None = None) ->
                 )
             except UnsupportedSchemaError as exc:
                 return _schema_failure(exc)
+            except PosterFeaturePausedError as exc:
+                print(str(exc), file=sys.stderr)
+                return 1
             except ValueError as exc:
                 print(str(exc), file=sys.stderr)
                 return 2
@@ -566,6 +606,9 @@ def main(argv: list[str] | None = None, *, context: CliContext | None = None) ->
                     model=args.model,
                     output=args.output,
                 )
+            except PosterFeaturePausedError as exc:
+                print(str(exc), file=sys.stderr)
+                return 1
             except ValueError as exc:
                 print(str(exc), file=sys.stderr)
                 return 2
@@ -605,6 +648,9 @@ def main(argv: list[str] | None = None, *, context: CliContext | None = None) ->
                     )
             except UnsupportedSchemaError as exc:
                 return _schema_failure(exc)
+            except PosterFeaturePausedError as exc:
+                print(str(exc), file=sys.stderr)
+                return 1
             except ValueError as exc:
                 print(str(exc), file=sys.stderr)
                 return 2
@@ -622,6 +668,12 @@ def main(argv: list[str] | None = None, *, context: CliContext | None = None) ->
                     provider=args.provider,
                     model=args.model,
                 )
+            except PosterFeaturePausedError:
+                _print(
+                    poster_feature_error_payload(schema_version="1.1"),
+                    output=args.output,
+                )
+                return 1
             except UnsupportedSchemaError as exc:
                 return _schema_failure(exc)
             except OperationLockedError as exc:

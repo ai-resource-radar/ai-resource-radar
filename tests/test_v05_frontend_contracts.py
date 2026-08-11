@@ -17,8 +17,10 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn('class="skip-link"', html)
         self.assertIn('id="main-content"', html)
         self.assertIn('aria-label="主要功能"', html)
-        for label in ("免费资源", "价格榜单", "日报", "技巧"):
+        for label in ("免费资源", "价格榜单", "技巧"):
             self.assertIn(label, html)
+        self.assertNotIn("日报", html)
+        self.assertNotIn('data-view="poster"', html)
         self.assertNotIn('class="nav-more"', html)
         self.assertNotIn('data-view="changes"', html)
         self.assertIn('data-open-view="changes"', html)
@@ -28,9 +30,11 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn('id="pricing-advanced"', html)
         self.assertIn('id="toggle-price-filters"', html)
         local_javascript = "\n".join(path.read_text(encoding="utf-8") for path in LOCAL.rglob("*.js"))
-        self.assertIn('"poster-diagnostics"', local_javascript)
+        self.assertNotIn('"poster-diagnostics"', local_javascript)
+        self.assertNotIn("/api/ai-daily", local_javascript)
+        self.assertFalse((LOCAL / "modules/views/poster.js").exists())
         self.assertIn('class="source-health-disclosure"', html)
-        self.assertEqual(len(set(re.findall(r'data-view="([^"]+)"', html))), 8)
+        self.assertEqual(len(set(re.findall(r'data-view="([^"]+)"', html))), 7)
 
     def test_local_entry_uses_cancellable_native_module_and_url_state(self) -> None:
         javascript = (LOCAL / "ai-resources.js").read_text(encoding="utf-8")
@@ -41,6 +45,7 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("AbortController", javascript + module)
         self.assertIn("readDashboardRoute", javascript + module)
         self.assertIn("writeDashboardRoute", javascript + module)
+        self.assertNotIn('"poster"', module)
         self.assertIn('window.addEventListener("hashchange", restoreRoute)', module)
         self.assertIn('window.addEventListener("popstate", restoreRoute)', module)
         self.assertIn('registry.resources?.loadResources?.(ctx)', module)

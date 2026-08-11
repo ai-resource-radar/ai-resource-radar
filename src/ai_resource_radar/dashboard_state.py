@@ -9,6 +9,10 @@ from typing import Any
 
 from ai_resource_radar.runtime import refresh
 from ai_resource_radar.locks import OperationLockedError, operation_lock_status
+from ai_resource_radar.feature_flags import (
+    poster_feature_status,
+    require_poster_generation,
+)
 from ai_resource_radar.notifications import (
     load_pending_notifications,
     notification_delivered,
@@ -201,7 +205,13 @@ class AiRadarDashboard:
             "benchmark_task": benchmark_task,
         }
 
+    def poster_feature(self) -> dict[str, Any]:
+        """Expose the immutable poster feature gate to host routers."""
+
+        return poster_feature_status()
+
     def start_poster_benchmark(self, *, cases: int = 3) -> dict[str, Any] | None:
+        require_poster_generation()
         with self._lock:
             if self._benchmark_state["status"] == "running" or bool(
                 operation_lock_status(self.path, "poster")["locked"]
@@ -248,6 +258,7 @@ class AiRadarDashboard:
     def review_poster_benchmark(
         self, *, approve: bool, notes: str = ""
     ) -> dict[str, Any]:
+        require_poster_generation()
         return review_poster_benchmark(
             self.path,
             approve=approve,
@@ -255,6 +266,7 @@ class AiRadarDashboard:
         )
 
     def start_poster(self, *, force: bool = False) -> dict[str, Any] | None:
+        require_poster_generation()
         with self._lock:
             if self._poster_state["status"] == "running" or bool(
                 operation_lock_status(self.path, "poster")["locked"]

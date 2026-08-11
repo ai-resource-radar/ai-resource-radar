@@ -1,7 +1,7 @@
 # Historical launch kit (promotion paused)
 
 This historical draft does **not** post to any service, create an account, or trigger a release.
-Promotion is paused for v0.6.1 while the public experience is synchronized with the local
+Promotion is paused for v0.7.1 while the public experience is synchronized with the local
 Dashboard. Do not use the copy below without a new explicit approval. Never invent counts,
 savings, uptime, or provider endorsements; if a number is useful, quote the dated public manifest.
 
@@ -14,7 +14,7 @@ get and how to claim it: {LIVE_URL}.
 
 ### Medium (social post)
 
-Free tiers and GPU prices move faster than a bookmark list. AI Resource Radar v0.4 runs deterministic
+Free tiers and GPU prices move faster than a bookmark list. AI Resource Radar v0.7.1 runs deterministic
 public-source checks, keeps the last trusted value when a parser drifts, and publishes a small JSON
 snapshot plus a human-friendly radar. Browse {LIVE_URL}, inspect {DATA_URL}, or run it locally with
 `uvx ai-resource-radar start --open`. MIT licensed, local-first, and no account data is
@@ -24,8 +24,8 @@ needed for collection.
 
 AI Resource Radar is a local-first tracker for free AI tokens, GPU compute, grants, and normalized
 prices. Its source-specific parsers retain evidence and verification time, distinguish official
-facts from community leads, and report changes instead of hiding them in a score. v0.4 adds eight
-official sources, transactional tip batches, and a strictly gated free CogView poster benchmark.
+facts from community leads, and report changes instead of hiding them in a score. v0.7.1 keeps the
+collection and public snapshot focused on free resources and prices while retaining backend compatibility.
 The public Pages view and documented JSON schema remain keyless: a single
 source can become `partial` without erasing trusted data, while a severe or invalid build is
 stopped before it can replace the previous site. Start at {LIVE_URL}, download the data at
@@ -40,15 +40,15 @@ AI 免费资源雷达每天核验公开的免费 Token、GPU 算力和价格变�
 
 ### 中文中等文案（社交平台）
 
-免费额度和 GPU 价格变化很快，收藏夹很容易过期。AI 免费资源雷达 v0.4 用确定性脚本核验公开来源，
+免费额度和 GPU 价格变化很快，收藏夹很容易过期。AI 免费资源雷达 v0.7.1 用确定性脚本核验公开来源，
 解析器漂移时保留最后可信值，并发布可核对的 JSON 快照和可读榜单。访问 {LIVE_URL}、查看 {DATA_URL}，
 或用 `uvx ai-resource-radar start --open` 本地运行。采集不需要账号信息，项目采用 MIT 许可证。
 
 ### 中文长文案（项目介绍）
 
 AI 免费资源雷达是本地优先的免费 Token、GPU 算力、资助和价格追踪器。每个来源都有专用解析器、官方
-证据和核验时间；社区目录只用于发现线索，不会把未经核验的内容标成官方。v0.4 增加 8 个官方来源、
-技巧整批事务纳管和免费智谱海报的严格本机基准。GitHub Pages 与稳定 JSON 数据继续保持：单个来源失败
+证据和核验时间；社区目录只用于发现线索，不会把未经核验的内容标成官方。GitHub Pages 与稳定 JSON
+数据继续保持聚焦免费资源和价格：单个来源失败
 会标为 `partial`，不会清空其他来源；严重的数据完整性
 问题会在发布前停止，旧站保持不变。你可以从 {LIVE_URL} 开始，下载 {DATA_URL}，或运行
 `uvx ai-resource-radar start --open`。接入前请阅读隐私、安全和迁移说明。

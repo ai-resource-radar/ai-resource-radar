@@ -217,13 +217,6 @@ export function updateHero(ctx) {
     ctx.dom.heroPickLabel.textContent = "安全原则";
     ctx.dom.heroPickTitle.textContent = "先审核，再吸收";
     ctx.dom.heroPickNote.textContent = "每次写入均备份、记录哈希并支持回滚";
-  } else if (currentView === "poster") {
-    ctx.dom.heroEyebrow.textContent = "AI-GENERATED DAILY POSTER";
-    ctx.dom.heroTitle.replaceChildren("每天一张，", element("br"), "AI 资源情报海报");
-    ctx.dom.heroCopy.textContent = "海报由图片模型整张生成，再由本机 OCR 核对服务商、免费额度和价格数字。校验不通过就不会发布。";
-    ctx.dom.heroPickLabel.textContent = "质量控制";
-    ctx.dom.heroPickTitle.textContent = "最多 3 次 · 严格校验";
-    ctx.dom.heroPickNote.textContent = "图片失败不会影响资源雷达和昨日海报";
   } else if (currentView === "token-prices") {
     ctx.dom.heroEyebrow.textContent = "TOKEN PRICE LEADERBOARD";
     ctx.dom.heroTitle.replaceChildren("Token 费用，", element("br"), "谁更便宜？");

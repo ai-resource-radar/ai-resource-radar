@@ -10,6 +10,7 @@ import time
 import unittest
 from unittest.mock import patch
 
+from ai_resource_radar import feature_flags
 from ai_resource_radar import SCHEMA_VERSION, UnsupportedSchemaError, run_doctor
 from ai_resource_radar.doctor import _package_version
 from ai_resource_radar.locks import (
@@ -77,6 +78,13 @@ def _hold_operation_lock(database: str, ready: object) -> None:
 
 
 class CoreV02Tests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._poster_generation_available = feature_flags.POSTER_GENERATION_AVAILABLE
+        feature_flags.POSTER_GENERATION_AVAILABLE = True
+
+    def tearDown(self) -> None:
+        feature_flags.POSTER_GENERATION_AVAILABLE = self._poster_generation_available
+
     @patch("ai_resource_radar.doctor.metadata.version", return_value="0.2.0")
     def test_doctor_prefers_runtime_source_version(self, installed_version) -> None:
         with patch("ai_resource_radar.__version__", "0.3.0"):

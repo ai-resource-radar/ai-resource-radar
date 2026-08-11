@@ -5,7 +5,7 @@ import {
 } from "/ai-radar-assets/ui-modules.js";
 
 export const KNOWN_VIEWS = new Set([
-  "recommended", "token", "gpu", "token-prices", "gpu-prices", "grant", "poster", "tips", "changes",
+  "recommended", "token", "gpu", "token-prices", "gpu-prices", "grant", "tips", "changes",
 ]);
 
 const FILTER_KEYS = new Set([

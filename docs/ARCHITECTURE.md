@@ -1,9 +1,9 @@
 # Architecture
 
-The project has two deliberately separated paths:
+The supported user path is deliberately narrow, while compatibility code remains isolated:
 
-1. **Deterministic radar** — allow-listed fetchers parse official/community sources, normalize offers, rank them with transparent A–D tiers, detect changes, and store compact evidence in SQLite.
-2. **Optional poster** — deterministic selectors choose five facts, a provider adapter generates one complete image, and local OCR validates exact anchors before an atomic publish.
+1. **Deterministic radar** — allow-listed fetchers parse official/community sources, normalize offers, rank them with transparent A–D tiers, detect changes, and store compact evidence in SQLite. This powers the local Dashboard and the public free-resource/price snapshot.
+2. **Retained poster backend** — the historical provider, OCR, report, and API paths remain isolated for stored-report and host compatibility. The v0.7.1 Dashboard does not expose or request them; legacy poster routes return to the recommended radar view.
 
 Core modules:
 
@@ -28,6 +28,9 @@ The browser UI is dependency-free. Native modules separate API cancellation, URL
 formatters, components, and view renderers; CSS is split into token, base, layout, component,
 view, and responsive layers. Legacy `/ai-resources.js` and `/ai-resources.css` remain entry points.
 
-SQLite schema v7 adds transactional multi-tip application batches and the local poster benchmark/review audit while preserving all v6 resources, modalities, notifications, daily reports, tips, and evidence. CogView benchmark images are generated at the official 864×1152 portrait size, proportionally normalized to 1080×1440 WebP, and validated on the final file. Failed candidate images are temporary files and are never retained.
+SQLite schema v7 adds transactional multi-tip application batches and retains the local poster
+benchmark/review audit while preserving all v6 resources, modalities, notifications, daily reports,
+tips, and evidence. The v0.7.1 Dashboard does not start poster generation or load poster images;
+existing reports and audit rows remain readable through backend compatibility paths.
 
 `ai-resource-radar` is the sole implementation of the radar core. A host such as Computer Health may provide its own paths, port, and LaunchAgent labels, but must call this package rather than copy collectors or storage code. Lock files live next to the selected database so different entry points coordinate on the same resource.

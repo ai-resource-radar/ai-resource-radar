@@ -7,10 +7,15 @@ The public site is a static, read-only view of the latest **AI Resource Radar** 
 - Builder: `ai-radar site build --database PATH --output DIR --base-url URL`
 - Provider pages: `/zh/providers/<slug>/` and `/en/providers/<slug>/`
 
-The repository's Pages workflow runs the deterministic, keyless refresh at 00:20 UTC each day and
-after every push to `main`. Both paths force all 23 registered sources even when a CI-only SQLite
-cache is restored. Manual runs force by default and expose an explicit diagnostic opt-out. The
-cache carries last trusted values between runs; it is not a user database and is never published.
+The repository's Pages workflow runs the deterministic, keyless primary refresh at 00:37 UTC each
+day and after every push to `main`. A fallback run starts at 03:17 UTC: it fetches the live manifest
+and skips refresh and deployment only when that manifest reports a healthy or partial snapshot
+refreshed today in Asia/Shanghai, no `stale`/`never` sources, and an age of at most four hours.
+Fetch, parse, missing, old, or abnormal fallback data instead runs the normal refresh. Whenever a
+refresh runs, primary, fallback, and push events force all 23 registered sources even when a CI-only
+SQLite cache is restored. Manual runs force by default and expose an explicit `force=false`
+diagnostic opt-out. The cache carries last trusted values between runs; it is not a user database
+and is never published.
 
 ## Public schema
 
@@ -20,7 +25,7 @@ cache carries last trusted values between runs; it is not a user database and is
 {
   "schema_version": "1.2",
   "dataset": "ai-resource-radar-public",
-  "package_version": "0.7.0",
+  "package_version": "0.7.1",
   "source_revision": "0123456789abcdef",
   "refresh_mode": "forced",
   "refresh_started_at": "2026-01-01T00:24:00Z",
@@ -108,11 +113,12 @@ bounded public facts only; users must remove any private account evidence before
 The workflow installs the package, restores only the CI SQLite snapshot, force-refreshes every
 allow-listed source, and runs `site build` with both the repository revision and refresh report. It
 also requires the public Cloudflare site token before building production Pages. It verifies a
-non-empty `index.html` and `data/manifest.json`, an exact 23-source attempt set, data age
-of at most 30 minutes, no `stale`/`never` source, and a matching Git revision. It then accepts only
-`healthy` or `partial` manifests, provider/integration datasets, representative bilingual provider
-pages, and exactly one analytics beacon in the root page. The artifact is uploaded and deployed in
-a separate Pages job, so a build or gate failure cannot replace the last deployed site.
+non-empty `index.html` and `data/manifest.json`, exactly 23 source attempts in the current refresh
+report, data age of at most 30 minutes, no `stale`/`never` source, and a matching Git revision. It
+then accepts only `healthy` or `partial` manifests, provider/integration datasets, representative
+bilingual provider pages, and exactly one analytics beacon in the root page. The artifact is
+uploaded and deployed in a separate Pages job, so a build or gate failure—and a fallback skip—cannot
+replace the last deployed site.
 
 One source failure is represented as `partial`; the parser keeps that source's last trusted value
 and records its health while other sources continue. A schema error, missing required output, or

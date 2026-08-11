@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.1 — 2026-08-11
+
+- Pause the local Dashboard poster surface: its navigation and controls are removed, and legacy
+  poster links now return to the recommended free-resources view without requesting poster APIs.
+- Keep poster backend routes, stored reports, and the schema-v7 history available for compatibility;
+  the public site continues to expose only free resources and price rankings.
+- Bump the package and stable facade version to 0.7.1.
+
 ## 0.7.0 — 2026-08-10
 
 - Generate 20 canonical, bilingual official-provider profiles with stable URLs, canonical/hreflang

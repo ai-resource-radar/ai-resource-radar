@@ -7,7 +7,6 @@ import * as components from "/ai-radar-assets/modules/components.js";
 import * as recommended from "/ai-radar-assets/modules/views/recommended.js";
 import * as resources from "/ai-radar-assets/modules/views/resources.js";
 import * as pricing from "/ai-radar-assets/modules/views/pricing.js";
-import * as poster from "/ai-radar-assets/modules/views/poster.js";
 import * as tips from "/ai-radar-assets/modules/views/tips.js";
 import * as changes from "/ai-radar-assets/modules/views/changes.js";
 
@@ -20,7 +19,6 @@ const viewModules = {
   "gpu-prices": pricing,
   resources,
   pricing,
-  poster,
   tips,
   changes,
 };

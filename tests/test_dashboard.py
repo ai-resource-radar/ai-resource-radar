@@ -9,6 +9,7 @@ from threading import Thread
 import unittest
 from unittest.mock import patch
 
+from ai_resource_radar import feature_flags
 from ai_resource_radar.dashboard import create_server
 from ai_resource_radar.locks import operation_lock
 from ai_resource_radar.store import SCHEMA_VERSION
@@ -16,6 +17,8 @@ from ai_resource_radar.store import SCHEMA_VERSION
 
 class DashboardTests(unittest.TestCase):
     def setUp(self) -> None:
+        self._poster_generation_available = feature_flags.POSTER_GENERATION_AVAILABLE
+        feature_flags.POSTER_GENERATION_AVAILABLE = True
         self.temporary = TemporaryDirectory()
         self.server = create_server(
             port=0,
@@ -30,6 +33,7 @@ class DashboardTests(unittest.TestCase):
         self.server.server_close()
         self.thread.join(timeout=2)
         self.temporary.cleanup()
+        feature_flags.POSTER_GENERATION_AVAILABLE = self._poster_generation_available
 
     def request(
         self,

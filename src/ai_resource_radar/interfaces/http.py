@@ -12,6 +12,9 @@ from pathlib import Path
 from typing import Any, Mapping, Protocol, runtime_checkable
 from urllib.parse import parse_qs
 
+from ai_resource_radar import feature_flags as _feature_flags
+from ai_resource_radar.feature_flags import poster_feature_error_payload
+
 
 Query = Mapping[str, list[str]]
 
@@ -300,6 +303,8 @@ def route_radar_post(
             return ApiResponse.json(409, {"error": "ai_radar_refresh_already_running"})
         return ApiResponse.json(202, state)
     if path == "/api/ai-daily/generate":
+        if not _feature_flags.POSTER_GENERATION_AVAILABLE:
+            return ApiResponse.json(409, poster_feature_error_payload())
         force = payload.get("force", False) if isinstance(payload, dict) else False
         if not isinstance(force, bool):
             return ApiResponse.json(400, {"error": "invalid_daily_generate_request"})
@@ -308,6 +313,8 @@ def route_radar_post(
             return ApiResponse.json(409, {"error": "daily_poster_already_running"})
         return ApiResponse.json(202, state)
     if path == "/api/ai-daily/benchmark":
+        if not _feature_flags.POSTER_GENERATION_AVAILABLE:
+            return ApiResponse.json(409, poster_feature_error_payload())
         cases = payload.get("cases", 3) if isinstance(payload, dict) else 3
         if isinstance(cases, bool) or not isinstance(cases, int) or not 1 <= cases <= 3:
             return ApiResponse.json(400, {"error": "invalid_poster_benchmark_request"})
@@ -316,6 +323,8 @@ def route_radar_post(
             return ApiResponse.json(409, {"error": "poster_benchmark_already_running"})
         return ApiResponse.json(202, state)
     if path == "/api/ai-daily/benchmark/review":
+        if not _feature_flags.POSTER_GENERATION_AVAILABLE:
+            return ApiResponse.json(409, poster_feature_error_payload())
         if not isinstance(payload, dict) or not isinstance(payload.get("approve"), bool):
             return ApiResponse.json(400, {"error": "invalid_poster_benchmark_review"})
         notes = payload.get("notes", "")

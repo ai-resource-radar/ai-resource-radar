@@ -15,8 +15,6 @@
   .hero-pick { border-left: 0; padding-left: 0; }
   .featured-resources,
   .browser-grid { grid-template-columns: 1fr; }
-  .poster-layout { grid-template-columns: 1fr; }
-  .poster-history { border-left: 0; border-top: 1px solid rgba(255,255,255,.11); padding: 22px 0 0; }
 }
 
 @media (max-width: 680px) {
@@ -101,12 +99,6 @@
   .policy-actions { align-items: stretch; flex-direction: column; }
   .provider-list-heading { align-items: flex-start; flex-direction: column; gap: 4px; }
   .change-row { grid-template-columns: 1fr; gap: 4px; }
-  .poster-layout { padding: 16px; }
-  .poster-stage-heading { align-items: flex-start; flex-direction: column; }
-  .poster-benchmark-heading { flex-direction: column; }
-  .poster-benchmark-actions { width: 100%; flex-wrap: wrap; }
-  .poster-generate { width: 100%; }
-  .poster-actions { align-items: flex-start; flex-direction: column; }
   .tips-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tip-audit-row { grid-template-columns: 1fr; }
 }

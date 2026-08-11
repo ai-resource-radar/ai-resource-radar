@@ -27,7 +27,8 @@ keeps the source and verification time beside each result, so the answer is prac
 free, how much you get, when it resets, what the restrictions are, and how to claim it**.
 
 The default collection pipeline is deterministic: **no AI, API key, cookie, or account data is
-required**. AI is used only by the optional daily poster.
+required**. Optional reviewable features remain isolated from collection and cannot change its
+verified evidence.
 
 ## Start with uvx
 
@@ -40,7 +41,7 @@ uvx ai-resource-radar start --open
 For the hosted snapshot, use [Live Radar](https://ai-resource-radar.github.io/ai-resource-radar/) or fetch
 the documented [public data manifest](https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json).
 The public site is an aggregate view; always follow an official source before relying on an offer.
-Its v0.7.0 snapshot adds crawlable Chinese and English provider pages, conservative copyable
+Its v0.7.1 snapshot adds crawlable Chinese and English provider pages, conservative copyable
 integration examples, and on-demand catalogue loading while remaining static and read-only. Pages
 binds each build to a fresh 23-source refresh and Git commit.
 
@@ -57,7 +58,6 @@ This project turns public source material into a small, explainable local databa
 | GPU price leaderboard | On-demand GPU prices normalized per hour for practical comparison |
 | Provider profiles | 20 bilingual official pages with free policy, prices, evidence, and verified integrations |
 | Change detection | New offers, quota or restriction changes, removals, and upcoming expiry |
-| Daily poster | Three free resources plus one token and one GPU price, drawn as one image and checked by local OCR |
 | AI efficiency tips | Official guidance and manual articles stay pending until a human approves safe AGENTS.md application |
 
 ## Quick start
@@ -94,7 +94,6 @@ ai-radar service uninstall
 | --- | :---: | :---: |
 | Collection, ranking, SQLite, and CLI | ✅ | ✅ |
 | Local dashboard | ✅ | ✅ |
-| Provider-aware image poster with Vision OCR | ✅ | — |
 | Menu bar notifications and LaunchAgent | ✅ | — |
 
 Windows is not tested yet. Linux CI verifies the deterministic core and dashboard; macOS CI also
@@ -132,36 +131,6 @@ The dashboard shows the reasons instead of hiding them inside a number.
 
 ## Optional extensions
 
-### Daily poster
-
-<p align="center">
-  <img src="docs/assets/poster-sample.webp" width="420" alt="Example AI Resource Radar daily poster">
-</p>
-
-> The image above is an explicitly labelled example. Always check the current official source
-> before using an offer.
-
-The poster model draws the complete image; the application never overlays or rewrites its text.
-The five facts are selected by deterministic code. macOS Vision then checks every required title,
-provider, value, action, statistic, update time, and unexpected number.
-
-```bash
-ai-radar poster models
-ai-radar poster configure --provider openclaw --model zai/cogview-3-flash --disable
-ai-radar poster benchmark status
-ai-radar poster benchmark              # up to three cases per day
-ai-radar poster benchmark review --approve
-ai-radar poster configure --provider openclaw --model zai/cogview-3-flash --enable
-ai-radar poster latest
-```
-
-The free `zai/cogview-3-flash` model is called through OpenClaw at its official `864×1152` portrait
-size and then proportionally resized to a final `1080×1440` WebP. Benchmark and daily generation
-share a hard limit of three image calls per day. Formal eligibility requires all six OCR and numeric
-allow-list cases across at least two calendar days, followed by a human check for ghosting, cropping,
-and layout errors. Until then the poster stays disabled; the system does not fall back to a paid
-OpenAI image call and radar refreshes continue normally.
-
 ### AI efficiency tips
 
 Official guidance and manually imported articles remain candidates until a human approves them.
@@ -177,11 +146,6 @@ flowchart LR
     B --> C[Normalized SQLite schema]
     C --> D[Explainable ranking and change detection]
     D --> E[Dashboard, CLI, and local notifications]
-    D --> F[Deterministic five-fact selection]
-    F --> G[Optional registered image model]
-    G --> H[Local Vision OCR]
-    H -->|Pass| E
-    H -->|Fail, max 3/day| I[Discard candidate and keep last valid poster]
 ```
 
 One failed source never clears data from other sources. A missing offer is removed only after two
@@ -219,7 +183,6 @@ Run `ai-radar <command> --help` for every filter and option.
 - Full fetched pages are parsed in memory and are not archived.
 - Fetch logs are retained for 90 days; ordinary changes and delivered notifications for 365 days.
 - Important free-tier changes and unread notifications are retained.
-- Posters are retained for 90 days; failed candidates are deleted immediately.
 - Periodic cleanup and threshold-based `VACUUM` prevent unbounded growth.
 - The dashboard accepts only loopback Host/Origin requests and serves no remote assets.
 

@@ -19,6 +19,12 @@ from urllib.request import urlopen
 from ai_resource_radar.locks import operation_lock
 from ai_resource_radar.model_registry import ImageModelSpec, find_image_model, get_image_model
 from ai_resource_radar.store import POSTER_RETENTION_DAYS, connect
+from ai_resource_radar.feature_flags import (
+    PosterFeaturePausedError,
+    poster_feature_error_payload,
+    poster_feature_status,
+    require_poster_generation,
+)
 
 from .constants import *  # noqa: F401,F403
 from .benchmark import (
@@ -172,6 +178,7 @@ def daily_report_status(
 def test_poster_model(**kwargs: Any) -> dict[str, Any]:
     """Compatibility wrapper that keeps service-level monkeypatches effective."""
 
+    require_poster_generation()
     return _provider_test_poster_model(
         **kwargs,
         configuration_status=_model_configuration_status,
@@ -191,6 +198,7 @@ def _generate_daily_poster_unlocked(
     provider: str | None = None,
     model: str | None = None,
 ) -> dict[str, Any]:
+    require_poster_generation()
     current = (now or datetime.now().astimezone()).astimezone()
     at = current.isoformat(timespec="seconds")
     report_date = current.date().isoformat()
@@ -504,6 +512,7 @@ def generate_daily_poster(
     provider: str | None = None,
     model: str | None = None,
 ) -> dict[str, Any]:
+    require_poster_generation()
     with operation_lock(path, "poster"):
         return _generate_daily_poster_unlocked(
             path,

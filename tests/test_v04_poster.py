@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 from PIL import Image
 
+from ai_resource_radar import feature_flags
 from ai_resource_radar.model_registry import get_image_model
 from ai_resource_radar.poster import (
     GeneratedPoster,
@@ -76,6 +77,13 @@ class SequenceOCR:
 
 
 class V04PosterTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._poster_generation_available = feature_flags.POSTER_GENERATION_AVAILABLE
+        feature_flags.POSTER_GENERATION_AVAILABLE = True
+
+    def tearDown(self) -> None:
+        feature_flags.POSTER_GENERATION_AVAILABLE = self._poster_generation_available
+
     def test_cogview_uses_official_portrait_size_and_stays_ineligible(self) -> None:
         spec = get_image_model("openclaw", OPENCLAW_POSTER_MODEL)
         self.assertIn("864x1152", spec.capabilities["sizes"])

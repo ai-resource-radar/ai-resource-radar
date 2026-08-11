@@ -19,7 +19,7 @@ const DATA = {
   gpuPrices: "data/gpu-prices.json",
   changes: "data/changes.json",
 };
-const PUBLIC_VERSION = "0.7.0";
+const PUBLIC_VERSION = "0.7.1";
 const PAGE_SIZE = 20;
 const RESOURCE_VIEWS = new Set(["recommended", "token", "gpu", "grant"]);
 const PRICE_VIEWS = new Set(["token-prices", "gpu-prices"]);

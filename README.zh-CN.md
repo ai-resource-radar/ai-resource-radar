@@ -26,7 +26,7 @@ AI 免费资源雷达是一个本地优先的免费 Token、GPU 算力、资助�
 **送什么、送多少、多久恢复、有哪些门槛，以及怎样开始使用**；每项结果都保留来源与核验时间。
 
 默认采集链路完全由确定性脚本执行，**不调用 AI，不需要 API Key、Cookie 或账号信息**。
-只有可选的日报海报会使用图片模型。
+需要人工审核的可选功能与采集链路隔离，也不能改变已核验的证据。
 
 ## 用 uvx 开始
 
@@ -39,7 +39,7 @@ uvx ai-resource-radar start --open
 也可以直接打开 [Live Radar](https://ai-resource-radar.github.io/ai-resource-radar/)，或下载有版本说明的
 [公开数据清单](https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json)。公开站点只是聚合视图，
 实际使用前仍应打开官方来源核对政策。
-v0.7.0 的公共站新增可索引的中英文服务商页面、经过兼容门禁的接入示例和按需数据加载，
+v0.7.1 的公共站新增可索引的中英文服务商页面、经过兼容门禁的接入示例和按需数据加载，
 同时继续保持纯静态只读；Pages 每次发布都会绑定本轮 23 个来源的刷新结果和对应 Git 提交。
 
 ## 你能得到什么
@@ -55,7 +55,6 @@ v0.7.0 的公共站新增可索引的中英文服务商页面、经过兼容门�
 | GPU 价格榜 | 统一折算按需 GPU 小时价，方便横向比较 |
 | 服务商档案 | 20 个中英文官方页面，集中展示免费政策、价格、证据和已核验接入示例 |
 | 变化检测 | 新增、额度变化、限制变化、下架和即将到期 |
-| 日报海报 | 3 项免费资源、1 项 Token 价格和 1 项 GPU 价格，整图生成并在本地 OCR 核验 |
 | AI 效率技巧 | 官方技巧与手动文章先进入候选，人工批准后安全写入全局或项目 AGENTS.md |
 
 ## 快速开始
@@ -92,7 +91,6 @@ ai-radar service uninstall
 | --- | :---: | :---: |
 | 采集、排序、SQLite 和 CLI | ✅ | ✅ |
 | 本地 Dashboard | ✅ | ✅ |
-| 可配置图片模型日报与 Vision OCR | ✅ | — |
 | 菜单栏通知和 LaunchAgent | ✅ | — |
 
 Windows 尚未经过验证。Linux CI 会检查确定性核心和 Dashboard；macOS CI 还会编译并测试
@@ -129,32 +127,6 @@ Vision OCR 与菜单栏 Helper。
 
 ## 可选扩展
 
-### 纯图片日报
-
-<p align="center">
-  <img src="docs/assets/poster-sample.webp" width="420" alt="AI 免费资源雷达示例日报">
-</p>
-
-> 上图已明确标注为示例数据；实际使用前始终应核对最新官方页面。
-
-图片模型负责绘制整张海报，程序不会在模型输出上覆盖或补画正文。5 项事实由确定性脚本选择，
-随后由 macOS Vision 在本地逐项检查标题、服务商、额度/价格、操作说明、统计值、更新时间和意外数字。
-
-```bash
-ai-radar poster models
-ai-radar poster configure --provider openclaw --model zai/cogview-3-flash --disable
-ai-radar poster benchmark status
-ai-radar poster benchmark              # 每天最多运行 3 组
-ai-radar poster benchmark review --approve
-ai-radar poster configure --provider openclaw --model zai/cogview-3-flash --enable
-ai-radar poster latest
-```
-
-`zai/cogview-3-flash` 通过 OpenClaw 使用官方免费的图片模型，先以 `864×1152` 生成，再等比缩放为
-`1080×1440` WebP。基准与日报共享每天最多 3 次图片调用的硬上限；必须在至少两个自然日内完成
-6/6 OCR 与数字白名单检查，并由人逐张确认无重影、裁切和错位后，才能启用正式日报。未达标时
-继续保持关闭，不会回退调用付费 OpenAI 图片 API，也不会阻塞雷达刷新。
-
 ### AI 效率技巧
 
 官方指南和手动导入的文章会先保持候选状态，必须人工批准后才会写入 `AGENTS.md` 的标记区块。
@@ -169,11 +141,6 @@ flowchart LR
     B --> C[规范化 SQLite 数据]
     C --> D[可解释排序与变化检测]
     D --> E[Dashboard、CLI 与本地通知]
-    D --> F[确定性精选 5 项事实]
-    F --> G[可选已注册图片模型]
-    G --> H[本地 Vision OCR]
-    H -->|通过| E
-    H -->|失败，每天最多 3 次| I[删除候选并保留上一张有效海报]
 ```
 
 单个来源失败不会清空其他来源的数据。资源只有在连续两次成功解析都确认缺失后才会下架；页面
@@ -220,7 +187,6 @@ ai-radar tips rollback-batch <batch-id>
 - 完整网页只在内存中解析，不会作为历史网页归档。
 - 抓取日志保留 90 天，普通变化和已送达通知保留 365 天。
 - 重要免费政策变化和未读通知持续保留。
-- 海报保留 90 天，失败候选图片立即删除。
 - 自动清理和按阈值执行的 `VACUUM` 可防止数据库无限增长。
 - Dashboard 只接受本机 Host/Origin，静态资源全部来自本地。
 

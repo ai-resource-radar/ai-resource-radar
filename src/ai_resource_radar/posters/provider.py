@@ -22,6 +22,12 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from ai_resource_radar.native_helper import prepare_macos_helper
+from ai_resource_radar.feature_flags import (
+    POSTER_FEATURE_REASON,
+    poster_feature_status,
+    poster_generation_available,
+    require_poster_generation,
+)
 from ai_resource_radar.model_registry import (
     IMAGE_MODELS,
     ImageModelSpec,
@@ -102,6 +108,7 @@ class KeychainStore:
         return completed.stdout.strip() or None
 
     def set(self, secret: str) -> None:
+        require_poster_generation()
         value = secret.strip()
         if not value:
             raise ValueError("poster_api_key_empty")
@@ -175,6 +182,7 @@ class OpenAIImageGenerator:
     def generate(
         self, request: PosterRequest, *, api_key: str | None
     ) -> GeneratedPoster:
+        require_poster_generation()
         if not api_key:
             raise RuntimeError("poster_not_configured")
         payload = json.dumps(
@@ -194,7 +202,7 @@ class OpenAIImageGenerator:
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
                 "Accept": "application/json",
-                "User-Agent": "AIResourceRadar/0.2",
+                "User-Agent": "AIResourceRadar/0.7.1",
             },
             method="POST",
         )
@@ -366,6 +374,7 @@ class OpenClawImageGenerator:
     def generate(
         self, request: PosterRequest, *, api_key: str | None = None
     ) -> GeneratedPoster:
+        require_poster_generation()
         del api_key
         if not self.binary:
             raise RuntimeError("poster_openclaw_unavailable")
@@ -639,8 +648,12 @@ def poster_benchmark_status(
                 "image_path": row["image_path"] if row else None,
             }
         )
-    return {
+    public_reason = (
+        POSTER_FEATURE_REASON if not poster_generation_available() else reason
+    )
+    payload = {
         "schema_version": "1.0",
+        **poster_feature_status(),
         "benchmark_version": POSTER_BENCHMARK_VERSION,
         "provider": spec.provider,
         "model": spec.model,
@@ -652,13 +665,16 @@ def poster_benchmark_status(
         "manual_review_status": review_status,
         "manual_review_at": review["reviewed_at"] if review else None,
         "formal_poster_eligible": eligible,
-        "reason": reason,
+        "reason": public_reason,
         "attempts_today": attempts_today,
         "remaining_calls_today": max(
             0, MAX_POSTER_ATTEMPTS_PER_DAY - attempts_today
         ),
         "cases": cases,
     }
+    if not poster_generation_available():
+        payload["eligibility_reason"] = reason
+    return payload
 
 
 def _effective_model_payload(
@@ -732,9 +748,25 @@ def poster_configuration(
             "model": model,
             "capabilities": {},
             "formal_poster_eligible": False,
-            "reason": "poster_model_unsupported",
-            "configuration_reason": "poster_model_unsupported",
+            **poster_feature_status(),
+            "reason": POSTER_FEATURE_REASON,
+            "configuration_reason": POSTER_FEATURE_REASON,
         }
+    if not poster_generation_available():
+        payload = _effective_model_payload(
+            path,
+            spec,
+            configured=False,
+            selected=True,
+            configuration_reason=POSTER_FEATURE_REASON,
+        )
+        payload["enabled"] = enabled
+        # ``reason`` is the public feature reason while the nested benchmark
+        # keeps its read-only historical eligibility details intact.
+        payload.update(poster_feature_status())
+        payload["reason"] = POSTER_FEATURE_REASON
+        payload["configuration_reason"] = POSTER_FEATURE_REASON
+        return payload
     status_resolver = configuration_status or _model_configuration_status
     configured, configuration_reason = status_resolver(
         spec,
@@ -765,23 +797,28 @@ def list_poster_models(
     selected_model = metadata.get(POSTER_MODEL_METADATA, POSTER_MODEL)
     result: list[dict[str, Any]] = []
     for spec in IMAGE_MODELS:
-        status_resolver = configuration_status or _model_configuration_status
-        configured, configuration_reason = status_resolver(
-            spec,
-            key_store=key_store,
-            openclaw_binary=openclaw_binary,
-        )
-        result.append(
-            _effective_model_payload(
-                path,
+        if poster_generation_available():
+            status_resolver = configuration_status or _model_configuration_status
+            configured, configuration_reason = status_resolver(
                 spec,
-                configured=configured,
-                selected=(
-                    spec.provider == selected_provider and spec.model == selected_model
-                ),
-                configuration_reason=configuration_reason,
+                key_store=key_store,
+                openclaw_binary=openclaw_binary,
             )
+        else:
+            configured, configuration_reason = False, POSTER_FEATURE_REASON
+        payload = _effective_model_payload(
+            path,
+            spec,
+            configured=configured,
+            selected=(
+                spec.provider == selected_provider and spec.model == selected_model
+            ),
+            configuration_reason=configuration_reason,
         )
+        if not poster_generation_available():
+            payload.update(poster_feature_status())
+            payload["reason"] = POSTER_FEATURE_REASON
+        result.append(payload)
     return tuple(result)
 
 
@@ -793,6 +830,8 @@ def configure_poster(
     model: str | None = None,
     configuration_status: Any = None,
 ) -> dict[str, Any]:
+    if enabled:
+        require_poster_generation()
     current = _read_poster_metadata(path)
     selected_provider = provider or current.get(
         POSTER_PROVIDER_METADATA, POSTER_PROVIDER
@@ -840,6 +879,7 @@ def test_poster_model(
     the three-attempt daily budget for paid models.
     """
 
+    require_poster_generation()
     spec = get_image_model(provider, model)
     if spec.formal_poster_eligible or spec.requires_api_key:
         raise ValueError("poster_model_test_requires_keyless_nonformal_model")

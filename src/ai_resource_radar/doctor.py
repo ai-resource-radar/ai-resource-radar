@@ -16,6 +16,8 @@ from typing import Any
 from urllib.request import ProxyHandler, build_opener
 
 from ai_resource_radar.locks import operation_lock_status
+from ai_resource_radar import feature_flags as _feature_flags
+from ai_resource_radar.feature_flags import poster_feature_status
 from ai_resource_radar.poster import _openclaw_provider_configured
 from ai_resource_radar.service import (
     DAILY_LABEL,
@@ -514,14 +516,37 @@ def diagnose(
                 conflicts=conflicts,
             )
         )
-    checks.append(_ocr_check(poster_enabled=poster_enabled))
-    checks.append(
-        _poster_provider_check(
-            poster_enabled=poster_enabled,
-            provider=poster_provider,
-            model=poster_model,
+    if _feature_flags.POSTER_GENERATION_AVAILABLE:
+        checks.append(_ocr_check(poster_enabled=poster_enabled))
+        checks.append(
+            _poster_provider_check(
+                poster_enabled=poster_enabled,
+                provider=poster_provider,
+                model=poster_model,
+            )
         )
-    )
+    else:
+        pause_details = poster_feature_status()
+        checks.append(
+            _check(
+                "ocr",
+                "healthy",
+                "Poster feature is paused; OCR probe skipped",
+                enabled=False,
+                **pause_details,
+            )
+        )
+        checks.append(
+            _check(
+                "poster_provider",
+                "healthy",
+                "Poster feature is paused; provider probe skipped",
+                enabled=False,
+                provider=poster_provider,
+                model=poster_model,
+                **pause_details,
+            )
+        )
     return DoctorReport(
         overall=_overall(checks),
         checks=tuple(checks),

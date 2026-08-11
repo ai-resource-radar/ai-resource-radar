@@ -14,6 +14,7 @@ from unittest.mock import patch
 
 from PIL import Image
 
+from ai_resource_radar import feature_flags
 from ai_resource_radar.cli import _parser as cli_parser, main as cli_main
 from ai_resource_radar.locks import OperationLockedError, operation_lock
 from ai_resource_radar.poster import (
@@ -269,6 +270,13 @@ def valid_ocr_text(facts: PosterFacts) -> str:
 
 
 class PosterTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._poster_generation_available = feature_flags.POSTER_GENERATION_AVAILABLE
+        feature_flags.POSTER_GENERATION_AVAILABLE = True
+
+    def tearDown(self) -> None:
+        feature_flags.POSTER_GENERATION_AVAILABLE = self._poster_generation_available
+
     def test_daily_cli_is_successful_when_source_failures_are_isolated(self) -> None:
         report = type(
             "Report",
