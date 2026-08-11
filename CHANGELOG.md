@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.2 — 2026-08-11
+
+- Refresh the English and Chinese READMEs with current public-radar, provider-profile, and local
+  Dashboard screenshots captured from the same 23-source data snapshot.
+- Remove obsolete v0.3 Dashboard artwork and the paused poster sample from the public repository.
+- Keep SQLite schema v7 and all collection, CLI, API, Dashboard, and service behavior unchanged.
+
 ## 0.7.1 — 2026-08-11
 
 - Pause the local Dashboard poster surface: its navigation and controls are removed, and legacy

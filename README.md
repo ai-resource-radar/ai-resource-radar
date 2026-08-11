@@ -20,7 +20,9 @@
 
 </div>
 
-![AI Resource Radar public radar](docs/assets/public-radar.png)
+![AI Resource Radar public overview with fresh sources and free AI offers](https://raw.githubusercontent.com/ai-resource-radar/ai-resource-radar/main/docs/assets/readme-public-overview.png)
+
+*The public radar exposes a current, read-only view without requiring an account or API key.*
 
 AI Resource Radar is a local-first tracker for free AI tiers, GPU compute, grants, and prices. It
 keeps the source and verification time beside each result, so the answer is practical: **what is
@@ -41,7 +43,7 @@ uvx ai-resource-radar start --open
 For the hosted snapshot, use [Live Radar](https://ai-resource-radar.github.io/ai-resource-radar/) or fetch
 the documented [public data manifest](https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json).
 The public site is an aggregate view; always follow an official source before relying on an offer.
-Its v0.7.1 snapshot adds crawlable Chinese and English provider pages, conservative copyable
+Its v0.7.2 snapshot adds crawlable Chinese and English provider pages, conservative copyable
 integration examples, and on-demand catalogue loading while remaining static and read-only. Pages
 binds each build to a fresh 23-source refresh and Git commit.
 
@@ -60,6 +62,10 @@ This project turns public source material into a small, explainable local databa
 | Change detection | New offers, quota or restriction changes, removals, and upcoming expiry |
 | AI efficiency tips | Official guidance and manual articles stay pending until a human approves safe AGENTS.md application |
 
+![OpenRouter provider profile with verified policy evidence and integration examples](https://raw.githubusercontent.com/ai-resource-radar/ai-resource-radar/main/docs/assets/readme-provider-openrouter.png)
+
+*Provider profiles keep the policy, evidence, verification time, and compatible integration examples together.*
+
 ## Quick start
 
 Requires Python 3.11 or newer. Install from PyPI in an isolated environment:
@@ -74,6 +80,10 @@ ai-radar dashboard --open
 ```
 
 The dashboard is available only on `127.0.0.1:18766`.
+
+![Local AI Resource Radar dashboard with actionable filters and source health](https://raw.githubusercontent.com/ai-resource-radar/ai-resource-radar/main/docs/assets/readme-local-dashboard.png)
+
+*The local Dashboard adds deeper filtering, claim steps, change history, and diagnostics without exposing local data.*
 
 On macOS, install the dashboard, menu bar helper, and 08:00 daily job:
 

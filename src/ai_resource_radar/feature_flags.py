@@ -1,7 +1,7 @@
 """Runtime feature gates shared by the local poster surfaces.
 
-The v0.7.1 release keeps the poster UI and all image-generation side effects
-paused.  Keeping the state in one small, dependency-free module prevents the
+The v0.7.1 and later releases hide the poster UI and keep all image-generation side effects
+paused. Keeping the state in one small, dependency-free module prevents the
 CLI, Dashboard, and provider layer from drifting on the response contract.
 """
 

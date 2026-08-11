@@ -1,6 +1,6 @@
 include README.zh-CN.md
 include CONTRIBUTING.md
 include CHANGELOG.md
-recursive-include docs *.md *.png *.webp
+recursive-include docs *.md *.png
 recursive-include tests *.py *.html
 recursive-include src/ai_resource_radar/public_web *.html *.css *.js *.txt *.xml *.svg *.png
