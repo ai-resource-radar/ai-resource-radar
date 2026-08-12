@@ -51,8 +51,30 @@ jobs:
         with:
           args: detect --source . --redact --verbose --no-banner
 
+  privacy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - name: Check new public identity metadata
+        env:
+          PRIVACY_BASE_SHA: ${{ github.event.before }}
+          PRIVACY_HEAD_SHA: ${{ github.sha }}
+          PRIVACY_ACTOR: ${{ github.actor }}
+          PRIVACY_REF_TYPE: ${{ github.ref_type }}
+          PRIVACY_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: >-
+          python3 .github/scripts/privacy_gate.py .
+          --base-sha "$PRIVACY_BASE_SHA"
+          --head-sha "$PRIVACY_HEAD_SHA"
+          --actor "$PRIVACY_ACTOR"
+          --ref-type "$PRIVACY_REF_TYPE"
+          --default-branch "$PRIVACY_DEFAULT_BRANCH"
+
   build:
-    needs: [core, macos, secrets]
+    needs: [core, macos, secrets, privacy]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

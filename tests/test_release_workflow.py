@@ -16,7 +16,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
             Path(__file__).parents[1] / ".github/workflows/release.yml"
         ).read_text(encoding="utf-8")
 
-        self.assertIn("needs: [core, macos, secrets]", workflow)
+        self.assertIn("needs: [core, macos, secrets, privacy]", workflow)
         self.assertIn("needs: build", workflow)
         self.assertIn("python -m unittest discover", workflow)
         self.assertIn("docker://zricethezav/gitleaks:v8.30.1", workflow)
@@ -24,6 +24,16 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertNotIn("gitleaks/gitleaks-action", workflow)
         self.assertIn("macos_poster_ocr.swift", workflow)
         self.assertIn("src/ai_resource_radar/frontend_shared", workflow)
+        self.assertIn("privacy:", workflow)
+        self.assertIn("fetch-depth: 0", workflow)
+        self.assertIn("github.event.before", workflow)
+        self.assertIn("--base-sha", workflow)
+        self.assertIn("--head-sha", workflow)
+        self.assertIn("--actor", workflow)
+        self.assertIn("github.ref_type", workflow)
+        self.assertIn("--ref-type", workflow)
+        self.assertIn("--default-branch", workflow)
+        self.assertNotIn("latest_commit_email_is_not_github_noreply", workflow)
         for name in ("cards.js", "cards.css", "dom.js", "formatters.js", "radar-tokens.css"):
             self.assertIn(name, workflow)
 

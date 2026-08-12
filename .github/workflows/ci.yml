@@ -58,7 +58,19 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Check new public identity metadata
-        run: python3 .github/scripts/privacy_gate.py .
+        env:
+          PRIVACY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          PRIVACY_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PRIVACY_ACTOR: ${{ github.actor }}
+          PRIVACY_REF_TYPE: ${{ github.ref_type }}
+          PRIVACY_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: >-
+          python3 .github/scripts/privacy_gate.py .
+          --base-sha "$PRIVACY_BASE_SHA"
+          --head-sha "$PRIVACY_HEAD_SHA"
+          --actor "$PRIVACY_ACTOR"
+          --ref-type "$PRIVACY_REF_TYPE"
+          --default-branch "$PRIVACY_DEFAULT_BRANCH"
 
   package:
     runs-on: ubuntu-latest
