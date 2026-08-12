@@ -40,6 +40,24 @@ class ReleasePreflightTests(unittest.TestCase):
         self.assertEqual("fail", checks[0].status)
         self.assertEqual(1, run.call_count)
 
+    def test_pypi_network_failure_is_a_bounded_check(self) -> None:
+        with mock.patch.object(MODULE.shutil, "which", return_value="/usr/bin/gh"), mock.patch.object(
+            MODULE, "_run", return_value=mock.Mock(returncode=0, stdout="larrynode\n", stderr="")
+        ), mock.patch.object(
+            MODULE,
+            "_git",
+            side_effect=["a" * 40, f"{'a' * 40}\trefs/heads/main", ""],
+        ), mock.patch.object(
+            MODULE.urllib.request,
+            "urlopen",
+            side_effect=MODULE.urllib.error.URLError("temporary timeout"),
+        ):
+            checks = MODULE.online_checks(ROOT, "v9.9.9")
+
+        self.assertEqual("fail", checks[-1].status)
+        self.assertEqual("pypi_version", checks[-1].id)
+        self.assertIn("could not be verified", checks[-1].summary)
+
 
 if __name__ == "__main__":
     unittest.main()

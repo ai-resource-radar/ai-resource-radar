@@ -190,12 +190,30 @@ def online_checks(root: Path, tag: str) -> list[Check]:
     url = f"https://pypi.org/pypi/ai-resource-radar/{version}/json"
     request = urllib.request.Request(url, headers={"User-Agent": "AIResourceRadar release-preflight"})
     try:
-        with urllib.request.urlopen(request, timeout=15):
+        with urllib.request.urlopen(request, timeout=30):
             exists = True
     except urllib.error.HTTPError as exc:
         if exc.code != 404:
-            raise
+            checks.append(
+                Check(
+                    "pypi_version",
+                    "fail",
+                    f"PyPI returned HTTP {exc.code}",
+                    "Retry later; do not release until version availability is known.",
+                )
+            )
+            return checks
         exists = False
+    except (OSError, urllib.error.URLError) as exc:
+        checks.append(
+            Check(
+                "pypi_version",
+                "fail",
+                f"PyPI availability could not be verified: {type(exc).__name__}",
+                "Retry later; do not release until version availability is known.",
+            )
+        )
+        return checks
     checks.append(
         Check(
             "pypi_version",
