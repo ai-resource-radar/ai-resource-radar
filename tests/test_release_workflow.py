@@ -19,7 +19,9 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("needs: [core, macos, secrets]", workflow)
         self.assertIn("needs: build", workflow)
         self.assertIn("python -m unittest discover", workflow)
-        self.assertIn("gitleaks/gitleaks-action", workflow)
+        self.assertIn("docker://zricethezav/gitleaks:v8.30.1", workflow)
+        self.assertIn("detect --source . --redact --verbose --no-banner", workflow)
+        self.assertNotIn("gitleaks/gitleaks-action", workflow)
         self.assertIn("macos_poster_ocr.swift", workflow)
         self.assertIn("src/ai_resource_radar/frontend_shared", workflow)
         for name in ("cards.js", "cards.css", "dom.js", "formatters.js", "radar-tokens.css"):
