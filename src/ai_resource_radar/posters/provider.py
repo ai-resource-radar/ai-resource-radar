@@ -202,7 +202,7 @@ class OpenAIImageGenerator:
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
                 "Accept": "application/json",
-                "User-Agent": "AIResourceRadar/0.7.2",
+                "User-Agent": "AIResourceRadar/0.7.3",
             },
             method="POST",
         )

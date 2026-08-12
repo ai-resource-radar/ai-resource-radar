@@ -25,7 +25,7 @@ and is never published.
 {
   "schema_version": "1.2",
   "dataset": "ai-resource-radar-public",
-  "package_version": "0.7.2",
+  "package_version": "0.7.3",
   "source_revision": "0123456789abcdef",
   "refresh_mode": "forced",
   "refresh_started_at": "2026-01-01T00:24:00Z",

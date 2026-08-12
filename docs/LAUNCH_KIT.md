@@ -1,7 +1,7 @@
 # Historical launch kit (promotion paused)
 
 This historical draft does **not** post to any service, create an account, or trigger a release.
-Promotion is paused for v0.7.2 while the public experience is synchronized with the local
+Promotion is paused for v0.7.3 while the public experience is synchronized with the local
 Dashboard. Do not use the copy below without a new explicit approval. Never invent counts,
 savings, uptime, or provider endorsements; if a number is useful, quote the dated public manifest.
 
@@ -14,7 +14,7 @@ get and how to claim it: {LIVE_URL}.
 
 ### Medium (social post)
 
-Free tiers and GPU prices move faster than a bookmark list. AI Resource Radar v0.7.2 runs deterministic
+Free tiers and GPU prices move faster than a bookmark list. AI Resource Radar v0.7.3 runs deterministic
 public-source checks, keeps the last trusted value when a parser drifts, and publishes a small JSON
 snapshot plus a human-friendly radar. Browse {LIVE_URL}, inspect {DATA_URL}, or run it locally with
 `uvx ai-resource-radar start --open`. MIT licensed, local-first, and no account data is
@@ -24,7 +24,7 @@ needed for collection.
 
 AI Resource Radar is a local-first tracker for free AI tokens, GPU compute, grants, and normalized
 prices. Its source-specific parsers retain evidence and verification time, distinguish official
-facts from community leads, and report changes instead of hiding them in a score. v0.7.2 keeps the
+facts from community leads, and report changes instead of hiding them in a score. v0.7.3 keeps the
 collection and public snapshot focused on free resources and prices while retaining backend compatibility.
 The public Pages view and documented JSON schema remain keyless: a single
 source can become `partial` without erasing trusted data, while a severe or invalid build is
@@ -40,7 +40,7 @@ AI 免费资源雷达每天核验公开的免费 Token、GPU 算力和价格变�
 
 ### 中文中等文案（社交平台）
 
-免费额度和 GPU 价格变化很快，收藏夹很容易过期。AI 免费资源雷达 v0.7.2 用确定性脚本核验公开来源，
+免费额度和 GPU 价格变化很快，收藏夹很容易过期。AI 免费资源雷达 v0.7.3 用确定性脚本核验公开来源，
 解析器漂移时保留最后可信值，并发布可核对的 JSON 快照和可读榜单。访问 {LIVE_URL}、查看 {DATA_URL}，
 或用 `uvx ai-resource-radar start --open` 本地运行。采集不需要账号信息，项目采用 MIT 许可证。
 

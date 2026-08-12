@@ -3,7 +3,7 @@
 The supported user path is deliberately narrow, while compatibility code remains isolated:
 
 1. **Deterministic radar** — allow-listed fetchers parse official/community sources, normalize offers, rank them with transparent A–D tiers, detect changes, and store compact evidence in SQLite. This powers the local Dashboard and the public free-resource/price snapshot.
-2. **Retained poster backend** — the historical provider, OCR, report, and API paths remain isolated for stored-report and host compatibility. The v0.7.2 Dashboard does not expose or request them; legacy poster routes return to the recommended radar view.
+2. **Retained poster backend** — the historical provider, OCR, report, and API paths remain isolated for stored-report and host compatibility. The v0.7.3 Dashboard does not expose or request them; legacy poster routes return to the recommended radar view.
 
 Core modules:
 
@@ -30,7 +30,7 @@ view, and responsive layers. Legacy `/ai-resources.js` and `/ai-resources.css` r
 
 SQLite schema v7 adds transactional multi-tip application batches and retains the local poster
 benchmark/review audit while preserving all v6 resources, modalities, notifications, daily reports,
-tips, and evidence. The v0.7.2 Dashboard does not start poster generation or load poster images;
+tips, and evidence. The v0.7.3 Dashboard does not start poster generation or load poster images;
 existing reports and audit rows remain readable through backend compatibility paths.
 
 `ai-resource-radar` is the sole implementation of the radar core. A host such as Computer Health may provide its own paths, port, and LaunchAgent labels, but must call this package rather than copy collectors or storage code. Lock files live next to the selected database so different entry points coordinate on the same resource.

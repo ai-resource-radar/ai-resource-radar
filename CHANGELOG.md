@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.3 — 2026-08-12
+
+- Prepare the project for brand-owned public distribution without changing collection, storage,
+  API, CLI, Dashboard, or schema-v7 behavior.
+- Replace personal repository, Pages, issue, and package author metadata with the AI Resource Radar
+  contributor identity; future releases use a project-owned GitHub noreply address.
+- Add release privacy checks for new commits, package metadata, local paths, personal email patterns,
+  and image metadata while retaining historical provenance unchanged.
+
 ## 0.7.2 — 2026-08-11
 
 - Refresh the English and Chinese READMEs with current public-radar, provider-profile, and local

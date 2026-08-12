@@ -49,6 +49,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  privacy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check new public identity metadata
+        run: python3 .github/scripts/privacy_gate.py .
+
   package:
     runs-on: ubuntu-latest
     steps:

@@ -43,7 +43,7 @@ uvx ai-resource-radar start --open
 For the hosted snapshot, use [Live Radar](https://ai-resource-radar.github.io/ai-resource-radar/) or fetch
 the documented [public data manifest](https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json).
 The public site is an aggregate view; always follow an official source before relying on an offer.
-Its v0.7.2 snapshot adds crawlable Chinese and English provider pages, conservative copyable
+Its v0.7.3 snapshot adds crawlable Chinese and English provider pages, conservative copyable
 integration examples, and on-demand catalogue loading while remaining static and read-only. Pages
 binds each build to a fresh 23-source refresh and Git commit.
 

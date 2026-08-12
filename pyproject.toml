@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-resource-radar"
-version = "0.7.2"
+version = "0.7.3"
 description = "Daily-verified free AI tokens, GPU compute, grants, and prices with a local-first dashboard"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
-authors = [{name = "ai-resource-radar"}]
+authors = [{name = "AI Resource Radar contributors"}]
 keywords = ["ai", "gpu", "tokens", "pricing", "free-tier", "price-tracker", "local-first"]
 dependencies = ["Pillow>=10,<13"]
 classifiers = [

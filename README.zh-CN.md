@@ -41,7 +41,7 @@ uvx ai-resource-radar start --open
 也可以直接打开 [Live Radar](https://ai-resource-radar.github.io/ai-resource-radar/)，或下载有版本说明的
 [公开数据清单](https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json)。公开站点只是聚合视图，
 实际使用前仍应打开官方来源核对政策。
-v0.7.2 的公共站新增可索引的中英文服务商页面、经过兼容门禁的接入示例和按需数据加载，
+v0.7.3 的公共站新增可索引的中英文服务商页面、经过兼容门禁的接入示例和按需数据加载，
 同时继续保持纯静态只读；Pages 每次发布都会绑定本轮 23 个来源的刷新结果和对应 Git 提交。
 
 ## 你能得到什么
