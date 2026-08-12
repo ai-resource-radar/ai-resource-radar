@@ -39,3 +39,17 @@ node --check src/ai_resource_radar/web/ai-resources.js
 
 When changing native macOS helpers, run the corresponding Swift compile check. Never commit API
 keys, cookies, account data, databases, logs, generated posters, or private source responses.
+
+## Maintainer release preflight
+
+The maintainer can validate a future release without opening a browser or changing remote state:
+
+```bash
+python3 .github/scripts/release_preflight.py
+python3 .github/scripts/release_preflight.py --online --full
+```
+
+The default command is local and read-only. `--online` only checks the existing GitHub CLI/keyring
+identity, `origin/main`, tag availability, and PyPI version availability. `--full` runs the Python
+and JavaScript checks. The command never logs in, creates or moves a tag, pushes, or publishes;
+those remain separate, explicit maintainer actions after `main` CI is green.
