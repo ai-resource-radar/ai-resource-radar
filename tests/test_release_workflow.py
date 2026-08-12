@@ -26,7 +26,11 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("src/ai_resource_radar/frontend_shared", workflow)
         self.assertIn("privacy:", workflow)
         self.assertIn("fetch-depth: 0", workflow)
-        self.assertIn("github.event.before", workflow)
+        self.assertIn(
+            "PRIVACY_BASE_SHA: 0000000000000000000000000000000000000000",
+            workflow,
+        )
+        self.assertNotIn("PRIVACY_BASE_SHA: ${{ github.event.before }}", workflow)
         self.assertIn("--base-sha", workflow)
         self.assertIn("--head-sha", workflow)
         self.assertIn("--actor", workflow)

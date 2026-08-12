@@ -60,7 +60,10 @@ jobs:
           ref: ${{ github.sha }}
       - name: Check new public identity metadata
         env:
-          PRIVACY_BASE_SHA: ${{ github.event.before }}
+          # A tag push's `before` value is the previous tag object when a
+          # failed, unpublished tag is replaced. That object may no longer be
+          # reachable. Tag audits intentionally inspect all history instead.
+          PRIVACY_BASE_SHA: 0000000000000000000000000000000000000000
           PRIVACY_HEAD_SHA: ${{ github.sha }}
           PRIVACY_ACTOR: ${{ github.actor }}
           PRIVACY_REF_TYPE: ${{ github.ref_type }}
