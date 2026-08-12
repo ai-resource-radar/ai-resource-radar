@@ -39,6 +39,8 @@ class ReleasePreflightTests(unittest.TestCase):
             checks = MODULE.run_full_checks(ROOT)
         self.assertEqual("fail", checks[0].status)
         self.assertEqual(1, run.call_count)
+        pythonpath = run.call_args.kwargs["env"]["PYTHONPATH"]
+        self.assertEqual(str(ROOT / "src"), pythonpath.split(MODULE.os.pathsep)[0])
 
     def test_pypi_network_failure_is_a_bounded_check(self) -> None:
         with mock.patch.object(MODULE.shutil, "which", return_value="/usr/bin/gh"), mock.patch.object(

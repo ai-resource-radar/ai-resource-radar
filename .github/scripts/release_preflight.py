@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -35,13 +36,19 @@ class Check:
     remediation: str = ""
 
 
-def _run(root: Path, *command: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+def _run(
+    root: Path,
+    *command: str,
+    check: bool = True,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         command,
         cwd=root,
         check=check,
         text=True,
         capture_output=True,
+        env=env,
     )
 
 
@@ -226,9 +233,17 @@ def online_checks(root: Path, tag: str) -> list[Check]:
 
 
 def run_full_checks(root: Path) -> list[Check]:
-    commands: list[tuple[str, tuple[str, ...]]] = [
-        ("python_tests", (sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py")),
-        ("compileall", (sys.executable, "-m", "compileall", "-q", "src")),
+    test_env = os.environ.copy()
+    source_root = str(root / "src")
+    existing_pythonpath = test_env.get("PYTHONPATH", "")
+    test_env["PYTHONPATH"] = source_root + (os.pathsep + existing_pythonpath if existing_pythonpath else "")
+    commands: list[tuple[str, tuple[str, ...], dict[str, str] | None]] = [
+        (
+            "python_tests",
+            (sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py"),
+            test_env,
+        ),
+        ("compileall", (sys.executable, "-m", "compileall", "-q", "src"), None),
     ]
     javascript = sorted(
         p for directory in ("web", "public_web", "frontend_shared")
@@ -236,11 +251,14 @@ def run_full_checks(root: Path) -> list[Check]:
     )
     if javascript and not shutil.which("node"):
         return [Check("javascript", "fail", "Node.js is unavailable", "Install Node.js for syntax checks.")]
-    commands.extend((f"javascript:{path.relative_to(root)}", ("node", "--check", str(path))) for path in javascript)
+    commands.extend(
+        (f"javascript:{path.relative_to(root)}", ("node", "--check", str(path)), None)
+        for path in javascript
+    )
 
     checks: list[Check] = []
-    for identifier, command in commands:
-        result = _run(root, *command, check=False)
+    for identifier, command, env in commands:
+        result = _run(root, *command, check=False, env=env)
         checks.append(
             Check(
                 identifier,
