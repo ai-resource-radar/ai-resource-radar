@@ -83,7 +83,13 @@ class PrivacyGateTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         head = _commit(root, "Larry", MODULE.LARRY_EMAIL, "Larry", MODULE.LARRY_EMAIL)
 
-        errors = MODULE.check(root, base_sha=base, head_sha=head, actor="larrynode")
+        errors = MODULE.check(
+            root,
+            base_sha=base,
+            head_sha=head,
+            actor="larrynode",
+            ref_type="branch",
+        )
 
         self.assertEqual([], errors)
 
@@ -125,7 +131,13 @@ class PrivacyGateTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         head = _commit(root, "External Contributor", "person@example.net", "Local Machine", "person@example.net")
 
-        errors = MODULE.check(root, base_sha=base, head_sha=head, actor="larrynode")
+        errors = MODULE.check(
+            root,
+            base_sha=base,
+            head_sha=head,
+            actor="larrynode",
+            ref_type="branch",
+        )
 
         self.assertTrue(any(error.startswith("larrynode_committer_identity_mismatch") for error in errors))
 
