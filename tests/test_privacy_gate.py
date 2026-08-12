@@ -18,6 +18,10 @@ class PrivacyGateTests(unittest.TestCase):
         self.assertNotIn("pyproject_author_is_not_project_identity", errors)
         self.assertNotIn("personal_email_pattern:pyproject.toml", errors)
 
+    def test_ci_checks_pr_head_instead_of_temporary_merge_commit(self) -> None:
+        workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        self.assertIn("ref: ${{ github.event.pull_request.head.sha || github.sha }}", workflow)
+
     def test_rejects_personal_email_and_local_path(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
