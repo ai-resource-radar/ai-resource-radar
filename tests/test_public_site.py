@@ -159,14 +159,20 @@ class PublicSiteTests(unittest.TestCase):
             with (site / "data/resources.csv").open(newline="", encoding="utf-8") as handle:
                 csv_rows = list(csv.DictReader(handle))
             public_text = "\n".join(path.read_text(encoding="utf-8") for path in (site / "data").rglob("*.json"))
-            self.assertEqual(manifest["schema_version"], "1.2")
+            self.assertEqual(manifest["schema_version"], "1.3")
             self.assertEqual(manifest["dataset"], "ai-resource-radar-public")
-            self.assertEqual(manifest["package_version"], "0.7.3")
+            self.assertEqual(manifest["package_version"], "0.8.0")
             self.assertEqual(manifest["source_revision"], "local")
             self.assertEqual(manifest["refresh_mode"], "cadence")
             self.assertEqual(manifest["data_age_seconds"], 0)
             self.assertEqual(manifest["status"], "healthy")
             self.assertEqual(manifest["analytics_provider"], "none")
+            self.assertEqual(manifest["search_console_provider"], "none")
+            self.assertEqual(manifest["experiment_started_at"], "2026-08-12")
+            self.assertTrue((site / "feed.xml").is_file())
+            self.assertTrue((site / "rss.xml").is_file())
+            self.assertTrue((site / "en/feed.xml").is_file())
+            self.assertTrue((site / "en/rss.xml").is_file())
             self.assertNotIn("static.cloudflareinsights.com", (site / "index.html").read_text(encoding="utf-8"))
             self.assertEqual(len(resources["items"]), len(csv_rows))
             self.assertTrue((site / "data/source-health.json").exists())
@@ -314,7 +320,7 @@ class PublicSiteTests(unittest.TestCase):
             self.assertEqual(html.count("static.cloudflareinsights.com/beacon.min.js"), 1)
             self.assertIn("https://cloudflareinsights.com", html)
             self.assertIn(token, html)
-            self.assertNotIn("spa\":true", html)
+            self.assertNotIn('spa":true', html)
 
         with TemporaryDirectory() as temp, patch.dict("os.environ", {}, clear=True):
             root = Path(temp)
@@ -327,6 +333,61 @@ class PublicSiteTests(unittest.TestCase):
                     now=NOW,
                     analytics_provider="cloudflare",
                 )
+
+    def test_google_search_console_is_environment_only_and_atomic(self) -> None:
+        token = "google-site-verification-token-12345"
+        with TemporaryDirectory() as temp, patch.dict(
+            "os.environ", {"AI_RADAR_GOOGLE_SITE_VERIFICATION_TOKEN": token}, clear=True
+        ):
+            root = Path(temp)
+            manifest = self._build(root)
+            # Rebuild through the same fixture patches with explicit Google mode.
+            database = root / "radar.sqlite3"
+            resources = {
+                "token": [offer("token", "token:free")],
+                "gpu": [offer("gpu", "gpu:free")],
+                "grant": [offer("grant", "grant:one")],
+            }
+            with patch(
+                "ai_resource_radar.public_site._page_offers",
+                side_effect=lambda _p, *, kind, include_pricing: resources[kind],
+            ), patch(
+                "ai_resource_radar.public_site._page_prices",
+                side_effect=lambda _p, *, kind: [token_price()] if kind == "token" else [gpu_price()],
+            ), patch("ai_resource_radar.public_site.list_changes", return_value=()), patch(
+                "ai_resource_radar.public_site.radar_summary", return_value=summary()
+            ):
+                manifest = build_public_site(
+                    database,
+                    root / "site",
+                    now=NOW,
+                    search_console_provider="google",
+                )
+            html = (root / "site/index.html").read_text(encoding="utf-8")
+            public_data = "\n".join(
+                path.read_text(encoding="utf-8")
+                for path in (root / "site/data").rglob("*.json")
+            )
+            self.assertEqual(manifest["search_console_provider"], "google")
+            self.assertEqual(html.count('name="google-site-verification"'), 1)
+            self.assertIn(token, html)
+            self.assertNotIn(token, public_data)
+
+        with TemporaryDirectory() as temp, patch.dict("os.environ", {}, clear=True):
+            root = Path(temp)
+            database = root / "radar.sqlite3"
+            database.touch()
+            output = root / "site"
+            output.mkdir()
+            (output / "sentinel").write_text("old", encoding="utf-8")
+            with self.assertRaisesRegex(PublicSiteError, "invalid_google"):
+                build_public_site(
+                    database,
+                    output,
+                    now=NOW,
+                    search_console_provider="google",
+                )
+            self.assertEqual((output / "sentinel").read_text(encoding="utf-8"), "old")
 
 
 if __name__ == "__main__":

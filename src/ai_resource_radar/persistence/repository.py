@@ -1083,7 +1083,9 @@ def list_changes(
             """
             SELECT c.id, c.offer_id, c.detected_at, c.change_type,
                    c.changed_fields_json, c.importance,
-                   o.provider, o.title, o.kind, o.priority_tier
+                   o.provider, o.title, o.kind, o.offer_type,
+                   o.priority_tier, o.verification_level, o.expires_at,
+                   o.homepage_url, o.status
             FROM offer_changes c
             LEFT JOIN offers o ON o.offer_id = c.offer_id
             WHERE c.detected_at >= ?

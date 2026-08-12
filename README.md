@@ -14,7 +14,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/github/license/ai-resource-radar/ai-resource-radar)](LICENSE)
 
-[Live Radar](https://ai-resource-radar.github.io/ai-resource-radar/) · [Data](https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json) · [Start with uvx](#start-with-uvx) · [中文](README.zh-CN.md)
+[Live Radar](https://ai-resource-radar.github.io/ai-resource-radar/) · [Data](https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json) · [Atom feed](https://ai-resource-radar.github.io/ai-resource-radar/feed.xml) · [RSS feed](https://ai-resource-radar.github.io/ai-resource-radar/rss.xml) · [Start with uvx](#start-with-uvx) · [中文](README.zh-CN.md)
 
 [How it works](#how-it-works) · [Public-site contract](docs/PUBLIC_SITE.md) · [Security](docs/SECURITY.md)
 
@@ -43,9 +43,35 @@ uvx ai-resource-radar start --open
 For the hosted snapshot, use [Live Radar](https://ai-resource-radar.github.io/ai-resource-radar/) or fetch
 the documented [public data manifest](https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json).
 The public site is an aggregate view; always follow an official source before relying on an offer.
-Its v0.7.3 snapshot adds crawlable Chinese and English provider pages, conservative copyable
-integration examples, and on-demand catalogue loading while remaining static and read-only. Pages
-binds each build to a fresh 23-source refresh and Git commit.
+Its v0.8.0 snapshot adds six bilingual scenario pages, stable Atom/RSS feeds, crawlable Chinese and
+English provider pages, conservative copyable integration examples, and on-demand catalogue loading
+while remaining static and read-only. Pages binds each build to a fresh 23-source refresh and Git
+commit.
+
+## Public scenarios, feeds, and search visibility
+
+The hosted site publishes six read-only scenario pages in both languages at
+`/zh/scenarios/<slug>/` and `/en/scenarios/<slug>/`. They turn common intents into short paths
+through the public catalogue; they do not create an account, personalize a result, or promise that
+an offer is still available.
+
+The public change/resource stream is available as Atom at `/feed.xml` and RSS at `/rss.xml`, with
+English equivalents at `/en/feed.xml` and `/en/rss.xml`. Entries contain stable hash IDs, bounded
+public facts, observed times, and safe same-origin or official-source links. They are a convenient
+read-only snapshot, not a guarantee of quota, price, eligibility, or availability. Use GitHub Watch
+for release and maintenance updates; it is not a substitute for the daily resource feeds.
+
+Production Pages can opt into Google Search Console site verification. The builder reads the
+repository secret only through `AI_RADAR_GOOGLE_SITE_VERIFICATION_TOKEN` and renders it as Google's
+required public verification marker in the homepage HTML. It omits the token from the manifest,
+JSON/XML feeds, logs, and workflow output. Local builds keep `--search-console-provider none` by
+default.
+
+The 30-day discovery experiment starts at `experiment_started_at` in the public manifest. Its
+success gate is intentionally modest: at least 10 of 12 scenario pages indexed, exposure in three
+intent categories, and at least one click or bounded confirmation signal. This is an indexing and
+reach check, not an exact conversion measurement: a confirmation does not prove a signup, purchase,
+or other user-level conversion, and no user identity is exported.
 
 ## What you get
 
@@ -59,6 +85,7 @@ This project turns public source material into a small, explainable local databa
 | Token price leaderboard | Input/output/cached prices normalized per 1M tokens, with sorting and filters |
 | GPU price leaderboard | On-demand GPU prices normalized per hour for practical comparison |
 | Provider profiles | 20 bilingual official pages with free policy, prices, evidence, and verified integrations |
+| Scenario pages and feeds | Six bilingual intent pages plus Atom/RSS snapshots with stable, public-only links |
 | Change detection | New offers, quota or restriction changes, removals, and upcoming expiry |
 | AI efficiency tips | Official guidance and manual articles stay pending until a human approves safe AGENTS.md application |
 
@@ -189,6 +216,11 @@ Run `ai-radar <command> --help` for every filter and option.
 ## Data, privacy, and storage
 
 - SQLite schema v7 uses file mode `0600`; no secrets, cookies, or account data are stored.
+- Public scenario pages and Atom/RSS feeds contain only bounded, aggregate source facts and stable
+  hash IDs; they never include local database IDs, request headers, cookies, or account data.
+- Google Search Console verification is a production build concern only. Its token is read from the
+  environment and rendered only in the required homepage verification marker; it is omitted from
+  manifests, data feeds, logs, and workflow output. The Pages workflow never prints it.
 - Tips retain only bounded summaries and evidence. Approval updates only the marked AGENTS.md managed block and creates a private backup under `~/.codex/backups/ai-tips/`.
 - Full fetched pages are parsed in memory and are not archived.
 - Fetch logs are retained for 90 days; ordinary changes and delivered notifications for 365 days.

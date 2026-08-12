@@ -18,8 +18,9 @@ on:
         type: boolean
 
 # The deploy action needs Pages write access and an OIDC token. Collection is
-# keyless. The public Cloudflare Web Analytics site token is supplied as a
-# repository variable and never used by collectors or the local dashboard.
+# keyless. Public analytics and Google Search Console verification are supplied
+# only to the production site build; neither token is used by collectors or the
+# local dashboard.
 permissions:
   contents: read
   pages: write
@@ -140,6 +141,7 @@ jobs:
       - name: Build public site
         env:
           AI_RADAR_CLOUDFLARE_ANALYTICS_TOKEN: ${{ vars.CLOUDFLARE_WEB_ANALYTICS_TOKEN }}
+          AI_RADAR_GOOGLE_SITE_VERIFICATION_TOKEN: ${{ secrets.GOOGLE_SITE_VERIFICATION_TOKEN }}
         run: |
           if [[ -z "$AI_RADAR_CLOUDFLARE_ANALYTICS_TOKEN" ]]; then
             echo "pages_gate_missing_cloudflare_analytics_token" >&2
@@ -151,7 +153,8 @@ jobs:
             --base-url https://ai-resource-radar.github.io/ai-resource-radar/ \
             --source-revision "${GITHUB_SHA}" \
             --refresh-report refresh-report.json \
-            --analytics-provider cloudflare
+            --analytics-provider cloudflare \
+            --search-console-provider google
 
       - name: Verify public site and publication gate
         run: |
@@ -195,12 +198,52 @@ jobs:
               raise SystemExit("pages_gate_source_health")
           if payload.get("analytics_provider") != "cloudflare":
               raise SystemExit("pages_gate_analytics_missing")
+          if payload.get("search_console_provider") != "google":
+              raise SystemExit("pages_gate_search_console_missing")
+          scenario_pages = payload.get("scenario_pages")
+          if isinstance(scenario_pages, dict):
+              scenario_routes = scenario_pages.get("pages") or scenario_pages.get("urls") or []
+              scenario_count = scenario_pages.get("count", len(scenario_routes))
+          elif isinstance(scenario_pages, list):
+              scenario_count = len(scenario_pages)
+          else:
+              scenario_count = 0
+          if int(scenario_count or 0) != 12:
+              raise SystemExit("pages_gate_scenario_pages")
+          feeds = payload.get("feeds")
+          if isinstance(feeds, dict):
+              feed_count = sum(
+                  len(value) for value in feeds.values() if isinstance(value, list)
+              )
+          elif isinstance(feeds, list):
+              feed_count = len(feeds)
+          else:
+              feed_count = 0
+          if feed_count != 4:
+              raise SystemExit("pages_gate_feeds")
+          if not payload.get("experiment_started_at"):
+              raise SystemExit("pages_gate_experiment_start")
           index_text = index.read_text(encoding="utf-8")
           if index_text.count("static.cloudflareinsights.com/beacon.min.js") != 1:
               raise SystemExit("pages_gate_analytics_beacon_count")
+          if index_text.count('name="google-site-verification"') != 1:
+              raise SystemExit("pages_gate_search_console_marker")
           for required in (
               "data/providers.json", "data/integrations.json", "data/featured.json",
               "zh/providers/openrouter/index.html", "en/providers/openrouter/index.html",
+              "feed.xml", "rss.xml", "en/feed.xml", "en/rss.xml",
+              "zh/scenarios/free-ai-api-no-card/index.html",
+              "en/scenarios/free-ai-api-no-card/index.html",
+              "zh/scenarios/recurring-free-ai-api/index.html",
+              "en/scenarios/recurring-free-ai-api/index.html",
+              "zh/scenarios/free-gpu-compute/index.html",
+              "en/scenarios/free-gpu-compute/index.html",
+              "zh/scenarios/mainland-supported-free-ai-api/index.html",
+              "en/scenarios/mainland-supported-free-ai-api/index.html",
+              "zh/scenarios/free-image-generation-api/index.html",
+              "en/scenarios/free-image-generation-api/index.html",
+              "zh/scenarios/openai-compatible-free-ai-api/index.html",
+              "en/scenarios/openai-compatible-free-ai-api/index.html",
           ):
               if not (root / required).is_file():
                   raise SystemExit(f"pages_gate_missing_v07_asset:{required}")

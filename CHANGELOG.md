@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.0 — 2026-08-12
+
+- Add six bilingual, crawlable scenario pages and four public Atom/RSS feed endpoints with stable
+  hash IDs, bounded source evidence, and safe same-origin or official-source links.
+- Add production Google Search Console site verification as a fail-closed `site build` option while
+  keeping local builds at `--search-console-provider none`; the token is rendered only in Google's
+  required public homepage marker and never enters manifests, feeds, logs, or workflow output.
+- Record `scenario_pages`, `feeds`, `search_console_provider`, and `experiment_started_at` in the
+  public manifest. The 30-day discovery experiment uses aggregate gates—10/12 scenario pages
+  indexed, three intent categories exposed, and one click or bounded confirmation signal—and does
+  not claim exact user conversion.
+- Keep SQLite schema v7 and collection, storage, API, CLI, Dashboard, release, tag, and PyPI
+  behavior compatible.
+
 ## 0.7.3 — 2026-08-12
 
 - Prepare the project for brand-owned public distribution without changing collection, storage,

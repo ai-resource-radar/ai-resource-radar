@@ -58,7 +58,7 @@ class PublicGrowthTests(unittest.TestCase):
             providers = json.loads((site / "data/providers.json").read_text(encoding="utf-8"))
             integrations = json.loads((site / "data/integrations.json").read_text(encoding="utf-8"))
             resources = json.loads((site / "data/resources.json").read_text(encoding="utf-8"))
-            self.assertEqual(manifest["schema_version"], "1.2")
+            self.assertEqual(manifest["schema_version"], "1.3")
             self.assertEqual(manifest["counts"]["providers"], 20)
             self.assertEqual(len(providers["items"]), 20)
             self.assertEqual(len(integrations["items"]), 9)
@@ -80,6 +80,8 @@ class PublicGrowthTests(unittest.TestCase):
             self.assertIn("provider_urls", first)
             self.assertIn("data-correction", first["report_url"])
             sitemap = (site / "sitemap.xml").read_text(encoding="utf-8")
+            # This fixture has too few distinct providers for scenario pages,
+            # so the v0.8 thin-content gate correctly preserves 41 URLs.
             self.assertEqual(sitemap.count("<url>"), 41)
 
     def test_landing_payload_is_bounded_and_full_catalog_urls_remain(self) -> None:

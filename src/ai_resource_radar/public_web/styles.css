@@ -103,6 +103,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .section-heading > p { margin: 0; color: var(--muted); font-size: 12px; }
 .section-caption { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
 .featured-section { margin-bottom: 30px; }
+.scenario-directory { margin: 20px 0 30px; padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.scenario-directory-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+.scenario-directory-list a { display: grid; gap: 4px; min-height: 74px; padding: 13px; color: var(--ink); text-decoration: none; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.scenario-directory-list a:hover { border-color: var(--accent); box-shadow: 0 8px 22px rgb(22 61 45 / 8%); }
+.scenario-directory-list small { color: var(--muted); }
 .featured-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
 .featured-grid .radar-card-facts { grid-template-columns: 1fr; }
 .featured-grid .radar-card-fact { grid-template-columns: 66px minmax(0, 1fr); }
@@ -159,6 +164,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 @media (max-width: 768px) {
+  .scenario-directory-list { grid-template-columns: 1fr; }
   .shell { width: min(100% - 28px, 1180px); }
   .header-inner { min-height: 68px; }
   .brand-copy small { display: none; }

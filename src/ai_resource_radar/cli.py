@@ -239,6 +239,12 @@ def _parser(context: CliContext | None = None) -> argparse.ArgumentParser:
         default="none",
         help="公开站聚合统计；本地构建默认关闭，Cloudflare token 仅从环境变量读取",
     )
+    site_build.add_argument(
+        "--search-console-provider",
+        choices=("none", "google"),
+        default="none",
+        help="搜索收录验证；Google 验证值仅从环境变量读取",
+    )
 
     start = actions.add_parser(
         "start",
@@ -737,6 +743,7 @@ def main(argv: list[str] | None = None, *, context: CliContext | None = None) ->
                 source_revision=args.source_revision,
                 refresh_report=args.refresh_report,
                 analytics_provider=args.analytics_provider,
+                search_console_provider=args.search_console_provider,
             )
         except UnsupportedSchemaError as exc:
             return _schema_failure(exc)

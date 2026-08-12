@@ -55,7 +55,12 @@ class PagesWorkflowTests(unittest.TestCase):
         self.assertIn('refresh_args+=(--force)', self.text)
         self.assertIn('payload["refresh_mode"]', self.text)
         self.assertIn('RADAR_FORCE', self.text)
-        self.assertNotIn("secrets.", self.text)
+        self.assertIn(
+            "AI_RADAR_GOOGLE_SITE_VERIFICATION_TOKEN: ${{ secrets.GOOGLE_SITE_VERIFICATION_TOKEN }}",
+            self.text,
+        )
+        self.assertNotIn("secrets.OPENAI_API_KEY", self.text)
+        self.assertNotIn("secrets.ANTHROPIC_API_KEY", self.text)
         self.assertNotIn("OPENAI_API_KEY", self.text)
         self.assertNotIn("ANTHROPIC_API_KEY", self.text)
 

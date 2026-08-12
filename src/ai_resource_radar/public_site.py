@@ -10,6 +10,7 @@ from __future__ import annotations
 import csv
 from datetime import datetime
 import hashlib
+from html import escape
 import json
 import os
 from pathlib import Path
@@ -32,6 +33,11 @@ from ai_resource_radar.provider_profiles import (
     provider_public_rows,
 )
 from ai_resource_radar.public_locales import presentation_for
+from ai_resource_radar.public_feeds import build_public_feeds
+from ai_resource_radar.scenario_pages import (
+    SCENARIOS,
+    build_scenario_pages,
+)
 from ai_resource_radar.pricing import list_gpu_prices, list_token_prices
 from ai_resource_radar.sources import SOURCES
 from ai_resource_radar.store import (
@@ -42,8 +48,9 @@ from ai_resource_radar.store import (
 )
 
 
-PUBLIC_SCHEMA_VERSION = "1.2"
+PUBLIC_SCHEMA_VERSION = "1.3"
 DATASET_ID = "ai-resource-radar-public"
+EXPERIMENT_STARTED_AT = "2026-08-12"
 MAX_PAGE = 500
 FREE_OFFER_TYPES = {"recurring_free", "variable_free", "grant"}
 OFFICIAL_LEVELS = {"official_api", "official_page"}
@@ -53,6 +60,7 @@ _SECRET_KEY = re.compile(
     re.IGNORECASE,
 )
 _ANALYTICS_TOKEN = re.compile(r"^[A-Za-z0-9_-]{16,128}$")
+_GOOGLE_SITE_VERIFICATION_TOKEN = re.compile(r"^[A-Za-z0-9_-]{20,128}$")
 _CLOUDFLARE_SCRIPT = "https://static.cloudflareinsights.com/beacon.min.js"
 
 
@@ -95,15 +103,47 @@ def _analytics_markup(provider: str) -> tuple[str, str]:
 
 def _inject_analytics(content: str, *, provider: str) -> str:
     script, csp = _analytics_markup(provider)
-    content = re.sub(
-        r'(<meta http-equiv="Content-Security-Policy" content=")[^"]*(">)',
-        lambda match: match.group(1) + csp + match.group(2),
-        content,
-        count=1,
-    )
+    csp_pattern = r'(<meta http-equiv="Content-Security-Policy" content=")[^"]*(">)'
+    if re.search(csp_pattern, content):
+        content = re.sub(
+            csp_pattern,
+            lambda match: match.group(1) + csp + match.group(2),
+            content,
+            count=1,
+        )
+    else:
+        content = content.replace(
+            "</head>",
+            f'    <meta http-equiv="Content-Security-Policy" content="{csp}">\n  </head>',
+            1,
+        )
     if script:
         content = content.replace("</head>", f"    {script}\n  </head>", 1)
     return content
+
+
+def _search_console_markup(provider: str) -> str:
+    """Return the public verification meta without persisting its source value.
+
+    Google requires the verification value to be public in the built homepage.
+    It is therefore accepted only from the environment and is intentionally
+    omitted from manifests, logs, command arguments, and exported datasets.
+    """
+
+    if provider == "none":
+        return ""
+    if provider != "google":
+        raise ValueError("invalid_search_console_provider")
+    token = os.environ.get("AI_RADAR_GOOGLE_SITE_VERIFICATION_TOKEN", "").strip()
+    if not _GOOGLE_SITE_VERIFICATION_TOKEN.fullmatch(token):
+        raise PublicSiteError("publish_gate_invalid_google_site_verification_token")
+    return f'<meta name="google-site-verification" content="{token}">'
+
+
+def _inject_search_console(content: str, *, markup: str) -> str:
+    if not markup:
+        return content
+    return content.replace("</head>", f"    {markup}\n  </head>", 1)
 
 
 def _time(value: Any) -> datetime | None:
@@ -278,7 +318,12 @@ def _public_change(row: dict[str, Any]) -> dict[str, Any]:
         "provider": row.get("provider"),
         "title": row.get("title"),
         "kind": row.get("kind"),
+        "offer_type": row.get("offer_type"),
         "priority_tier": row.get("priority_tier"),
+        "verification_level": row.get("verification_level"),
+        "expires_at": row.get("expires_at"),
+        "homepage_url": _safe_url(row.get("homepage_url")),
+        "status": row.get("status"),
     }
 
 
@@ -320,6 +365,39 @@ def _featured_resources(resources: list[dict[str, Any]], *, limit: int = 12) -> 
         if len(selected) >= limit:
             break
     return selected
+
+
+def _scenario_directory(pages: Iterable[Any]) -> str:
+    """Render crawlable homepage navigation for generated scenario pages."""
+
+    by_slug = {
+        page.slug: page
+        for page in pages
+        if getattr(page, "locale", None) == "zh-CN"
+    }
+    links: list[str] = []
+    for definition in SCENARIOS:
+        page = by_slug.get(definition.slug)
+        if page is None:
+            continue
+        relative = f"./zh/scenarios/{definition.slug}/"
+        links.append(
+            '<a href="{}"><strong>{}</strong><small>{} 个服务商 · {} 条资源</small></a>'.format(
+                escape(relative, quote=True),
+                escape(definition.zh_title),
+                int(page.provider_count),
+                int(page.resource_count),
+            )
+        )
+    if not links:
+        return ""
+    return (
+        '<section class="scenario-directory" aria-labelledby="scenario-directory-title">'
+        '<div class="section-heading compact"><div><p class="section-kicker">DECISION GUIDES</p>'
+        '<h2 id="scenario-directory-title">按你的实际需求找资源</h2></div>'
+        '<p>官方核验 · 每日更新 · 无需逐个翻官网</p></div>'
+        f'<div class="scenario-directory-list">{"".join(links)}</div></section>'
+    )
 
 
 def _write_json(path: Path, value: Any) -> None:
@@ -396,6 +474,7 @@ def build_public_site(
     source_revision: str | None = None,
     refresh_report: Path | dict[str, Any] | None = None,
     analytics_provider: str = "none",
+    search_console_provider: str = "none",
 ) -> dict[str, Any]:
     """Atomically build a public static snapshot, preserving an old output on failure."""
 
@@ -407,6 +486,7 @@ def build_public_site(
     # Validate configuration before reading or transforming the snapshot so a
     # production mistake preserves the prior atomic site untouched.
     analytics_script, analytics_csp = _analytics_markup(analytics_provider)
+    search_console_markup = _search_console_markup(search_console_provider)
     current = (now or datetime.now().astimezone()).astimezone()
     generated_at = current.isoformat(timespec="seconds")
     report = _load_refresh_report(refresh_report)
@@ -540,6 +620,38 @@ def build_public_site(
             raise PublicSiteError("publish_gate_data_too_old")
         if int(source_summary.get("stale") or 0) or int(source_summary.get("never") or 0):
             raise PublicSiteError("publish_gate_stale_sources")
+    scenario_pages = build_scenario_pages(
+        resources,
+        integrations,
+        base_url=base_url,
+        source_revision=revision,
+        analytics_script=analytics_script,
+        csp=analytics_csp,
+        require_minimum=True,
+        stylesheet_href=base_url.rstrip("/") + "/scenario.css",
+    )
+    scenario_urls = [page.url for page in scenario_pages]
+    scenario_rows = []
+    pages_by_slug: dict[str, list[Any]] = {}
+    for page in scenario_pages:
+        pages_by_slug.setdefault(page.slug, []).append(page)
+    for definition in SCENARIOS:
+        localized = pages_by_slug.get(definition.slug, [])
+        if len(localized) != 2:
+            continue
+        representative = localized[0]
+        scenario_rows.append(
+            {
+                "slug": definition.slug,
+                "urls": {
+                    "zh-CN": next(page.url for page in localized if page.locale == "zh-CN"),
+                    "en": next(page.url for page in localized if page.locale == "en"),
+                },
+                "provider_count": representative.provider_count,
+                "resource_count": representative.resource_count,
+                "filter_summary": _jsonable(representative.filter_summary),
+            }
+        )
     data = {
         "manifest": {
             "schema_version": PUBLIC_SCHEMA_VERSION,
@@ -547,6 +659,15 @@ def build_public_site(
             "package_version": __version__,
             "source_revision": revision,
             "analytics_provider": analytics_provider,
+            "search_console_provider": search_console_provider,
+            "experiment_started_at": EXPERIMENT_STARTED_AT,
+            "scenario_pages": scenario_urls,
+            "feeds": [
+                base_url.rstrip("/") + "/feed.xml",
+                base_url.rstrip("/") + "/rss.xml",
+                base_url.rstrip("/") + "/en/feed.xml",
+                base_url.rstrip("/") + "/en/rss.xml",
+            ],
             "refresh_mode": refresh_mode,
             "refresh_started_at": refresh_started_at,
             "data_age_seconds": data_age_seconds,
@@ -561,6 +682,7 @@ def build_public_site(
                 "changes": len(changes),
                 "providers": len(providers),
                 "integrations": len(integrations),
+                "scenario_pages": len(scenario_urls),
                 "free_image_generation": sum(bool(row.get("free_image_generation")) for row in resources),
                 **gate,
             },
@@ -627,6 +749,11 @@ def build_public_site(
             "generated_at": generated_at,
             "items": integrations,
         },
+        "scenarios": {
+            "schema_version": PUBLIC_SCHEMA_VERSION,
+            "generated_at": generated_at,
+            "items": scenario_rows,
+        },
     }
 
     parent = output.parent
@@ -649,7 +776,20 @@ def build_public_site(
             )
             if asset.suffix == ".html":
                 content = _inject_analytics(content, provider=analytics_provider)
+                content = _inject_search_console(
+                    content, markup=search_console_markup
+                )
             asset.write_text(content, encoding="utf-8")
+        index_path = temp / "index.html"
+        index_text = index_path.read_text(encoding="utf-8")
+        index_text = re.sub(
+            r"<!-- AI-RADAR-SCENARIOS:BEGIN -->.*?<!-- AI-RADAR-SCENARIOS:END -->",
+            _scenario_directory(scenario_pages),
+            index_text,
+            count=1,
+            flags=re.DOTALL,
+        )
+        index_path.write_text(index_text, encoding="utf-8")
         integrations_by_slug = {row["slug"]: row for row in integrations}
         for profile in PROVIDER_PROFILES:
             for locale, language_path in (("zh-CN", "zh"), ("en", "en")):
@@ -670,11 +810,28 @@ def build_public_site(
                     ),
                     encoding="utf-8",
                 )
+        for page in scenario_pages:
+            language_path = "en" if page.locale == "en" else "zh"
+            destination = temp / language_path / "scenarios" / page.slug
+            destination.mkdir(parents=True, exist_ok=True)
+            destination.joinpath("index.html").write_text(
+                _inject_search_console(page.html, markup=""),
+                encoding="utf-8",
+            )
+            confirmation = destination / "confirm"
+            confirmation.mkdir()
+            confirmation.joinpath("index.html").write_text(
+                _inject_analytics(
+                    page.confirmation_html,
+                    provider=analytics_provider,
+                ),
+                encoding="utf-8",
+            )
         sitemap_urls = [canonical] + [
             provider_page_url(base_url, locale, profile.slug)
             for profile in PROVIDER_PROFILES
             for locale in ("zh-CN", "en")
-        ]
+        ] + scenario_urls
         (temp / "sitemap.xml").write_text(
             '<?xml version="1.0" encoding="UTF-8"?>\n'
             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
@@ -682,6 +839,16 @@ def build_public_site(
             + "</urlset>\n",
             encoding="utf-8",
         )
+        feeds = build_public_feeds(
+            resources,
+            changes,
+            base_url=base_url,
+            now=current,
+        )
+        for relative, content in feeds.items():
+            destination = temp / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text(content, encoding="utf-8")
         data_dir = temp / "data"
         data_dir.mkdir()
         for name, payload in data.items():

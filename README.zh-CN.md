@@ -14,7 +14,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/github/license/ai-resource-radar/ai-resource-radar)](LICENSE)
 
-[Live Radar](https://ai-resource-radar.github.io/ai-resource-radar/) · [Data](https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json) · [uvx 开始](#用-uvx-开始) · [English](README.md)
+[Live Radar](https://ai-resource-radar.github.io/ai-resource-radar/) · [Data](https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json) · [Atom 订阅](https://ai-resource-radar.github.io/ai-resource-radar/feed.xml) · [RSS 订阅](https://ai-resource-radar.github.io/ai-resource-radar/rss.xml) · [uvx 开始](#用-uvx-开始) · [English](README.md)
 
 [工作原理](#工作原理) · [公开站点说明](docs/PUBLIC_SITE.md) · [安全说明](docs/SECURITY.md)
 
@@ -41,8 +41,29 @@ uvx ai-resource-radar start --open
 也可以直接打开 [Live Radar](https://ai-resource-radar.github.io/ai-resource-radar/)，或下载有版本说明的
 [公开数据清单](https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json)。公开站点只是聚合视图，
 实际使用前仍应打开官方来源核对政策。
-v0.7.3 的公共站新增可索引的中英文服务商页面、经过兼容门禁的接入示例和按需数据加载，
-同时继续保持纯静态只读；Pages 每次发布都会绑定本轮 23 个来源的刷新结果和对应 Git 提交。
+v0.8.0 的公共站新增 6 个双语场景页、稳定的 Atom/RSS 订阅、可索引的中英文服务商页面、
+经过兼容门禁的接入示例和按需数据加载，同时继续保持纯静态只读；Pages 每次发布都会绑定本轮
+23 个来源的刷新结果和对应 Git 提交。
+
+## 公共场景页、订阅与搜索可见性
+
+托管站点在 `/zh/scenarios/<slug>/` 和 `/en/scenarios/<slug>/` 提供 6 个只读场景页（共 12 个
+地址）。它们把常见使用意图串成公开目录中的短路径；不会创建账号、个性化结果，也不承诺资源
+仍然有效。
+
+资源与变化流可通过 `/feed.xml`（Atom）和 `/rss.xml`（RSS）订阅，英文版本分别位于
+`/en/feed.xml` 和 `/en/rss.xml`。每条记录使用稳定哈希 ID，包含有界的公开事实、观察时间和安全的
+同源或官方链接。订阅只是只读快照，不保证额度、价格、资格或可用性；版本与维护动态请使用
+GitHub Watch，不要把它当成每日资源订阅的替代品。
+
+生产 Pages 可以启用 Google Search Console 站点验证。构建器只从
+`AI_RADAR_GOOGLE_SITE_VERIFICATION_TOKEN` 环境变量读取仓库密钥；Token 只写入 Google 要求的首页
+公开验证 meta 标记，不进入清单、日志或订阅。本地构建默认使用
+`--search-console-provider none`。
+
+30 天发现实验的起点记录在公开清单的 `experiment_started_at`。门槛保持克制：12 个场景页至少有
+10 个被索引、覆盖 3 类意图曝光，并出现至少一次点击或有界的确认信号。这是索引与触达健康检查，
+不是精确转化统计：确认不等于注册、购买或其他用户级转化，系统也不会导出用户身份。
 
 ## 你能得到什么
 
@@ -56,6 +77,7 @@ v0.7.3 的公共站新增可索引的中英文服务商页面、经过兼容门�
 | Token 价格榜 | 统一折算每 100 万 Token 的输入、输出和缓存价格，并支持排序筛选 |
 | GPU 价格榜 | 统一折算按需 GPU 小时价，方便横向比较 |
 | 服务商档案 | 20 个中英文官方页面，集中展示免费政策、价格、证据和已核验接入示例 |
+| 场景页与订阅 | 6 个双语意图页面，以及使用稳定公共链接的 Atom/RSS 快照 |
 | 变化检测 | 新增、额度变化、限制变化、下架和即将到期 |
 | AI 效率技巧 | 官方技巧与手动文章先进入候选，人工批准后安全写入全局或项目 AGENTS.md |
 
@@ -193,6 +215,10 @@ ai-radar tips rollback-batch <batch-id>
 ## 数据、隐私与存储
 
 - SQLite schema v7，数据库权限为 `0600`，不保存密钥、Cookie 或账号信息。
+- 公共场景页和 Atom/RSS 订阅只包含有界的聚合来源事实与稳定哈希 ID，不包含本地数据库 ID、请求
+  头、Cookie 或账号信息。
+- Google Search Console 验证只在生产构建中启用。Token 从环境变量读取，只出现在 Google 要求的
+  首页验证 meta 标记中，不进入清单或订阅，Pages Workflow 也不会打印。
 - 效率技巧只保存短摘要和必要证据；全部需要人工批准。批准后仅更新带标记的 AGENTS.md 受管区块，并在 `~/.codex/backups/ai-tips/` 创建私有备份。
 - 完整网页只在内存中解析，不会作为历史网页归档。
 - 抓取日志保留 90 天，普通变化和已送达通知保留 365 天。
