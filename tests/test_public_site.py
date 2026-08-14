@@ -183,9 +183,11 @@ class PublicSiteTests(unittest.TestCase):
             chinese_home = (site / "zh/index.html").read_text(encoding="utf-8")
             self.assertIn('<html lang="en">', english_home)
             self.assertIn('href="./en/feed.xml"', english_home)
+            self.assertIn("View on GitHub", english_home)
             self.assertNotIn("今天有哪些真正能领", english_home)
             self.assertIn('<html lang="zh-CN">', chinese_home)
             self.assertIn("今天有哪些真正能领", chinese_home)
+            self.assertIn("查看 GitHub", chinese_home)
             self.assertIn('href="./feed.xml"', chinese_home)
             # This narrow fixture has only one provider, so the minimum
             # three-provider scenario gate must suppress thin directory links.

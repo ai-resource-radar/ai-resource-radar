@@ -506,6 +506,7 @@ def _scenario_directory(pages: Iterable[Any], *, locale: str = "en") -> str:
 
 _ZH_HOMEPAGE_COPY = {
     "health.loading": "读取来源状态", "health.title": "来源核验状态",
+    "header.github": "查看 GitHub",
     "nav.free": "免费资源", "nav.prices": "价格榜单",
     "view.recommended": "全部精选", "view.token": "免费 Token", "view.gpu": "免费 GPU",
     "view.grant": "资助活动", "view.tokenPrices": "Token 价格", "view.gpuPrices": "GPU 价格",

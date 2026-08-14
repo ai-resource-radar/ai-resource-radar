@@ -39,6 +39,7 @@ const FALLBACK_REGION_PRESETS = {
 const COPY = {
   "zh-CN": {
     "health.loading": "读取来源状态", "health.title": "来源核验状态",
+    "header.github": "查看 GitHub",
     "nav.free": "免费资源", "nav.prices": "价格榜单",
     "view.recommended": "全部精选", "view.token": "免费 Token", "view.gpu": "免费 GPU",
     "view.grant": "资助活动", "view.tokenPrices": "Token 价格", "view.gpuPrices": "GPU 价格",
@@ -67,6 +68,7 @@ const COPY = {
   },
   en: {
     "health.loading": "Loading source status", "health.title": "Source verification",
+    "header.github": "View on GitHub",
     "nav.free": "Free resources", "nav.prices": "Price rankings",
     "view.recommended": "Recommended", "view.token": "Free tokens", "view.gpu": "Free GPU",
     "view.grant": "Grants", "view.tokenPrices": "Token prices", "view.gpuPrices": "GPU prices",

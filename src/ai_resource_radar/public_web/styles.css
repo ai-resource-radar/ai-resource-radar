@@ -48,6 +48,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .brand-copy strong { letter-spacing: -.03em; }
 .brand-copy small { color: var(--muted); font-size: 11px; }
 .header-actions { display: flex; align-items: center; gap: 10px; }
+.github-cta { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 7px; padding: 8px 13px; color: #f2ffc9; background: var(--ink); border: 1px solid var(--ink); border-radius: 10px; box-shadow: 0 7px 18px rgb(23 35 29 / 14%); font-size: 12px; font-weight: 800; text-decoration: none; white-space: nowrap; }
+.github-cta:hover { color: #fff; background: var(--green-dark); border-color: var(--green-dark); transform: translateY(-1px); }
+.github-cta-arrow { font-size: 15px; line-height: 1; }
 .language-toggle { min-height: 44px; min-width: 70px; padding: 8px 11px; color: var(--green-dark); background: var(--green-soft); border: 1px solid #c4e4cf; border-radius: 10px; font-size: 12px; font-weight: 750; }
 
 .health-disclosure { position: relative; }
@@ -188,6 +191,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .shell { width: calc(100% - 24px); }
   .brand-copy strong { font-size: 14px; }
   .health-pill { max-width: 112px; overflow: hidden; text-overflow: ellipsis; }
+  .github-cta { width: 44px; padding-inline: 8px; }
+  .github-cta-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .language-toggle { min-width: 58px; }
   .hero h1 { font-size: 36px; }
   .summary-grid { grid-template-columns: 1fr 1fr; gap: 7px; }
@@ -208,7 +213,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .header-actions { gap: 6px; }
   .brand { gap: 8px; }
   .brand-mark { width: 36px; height: 36px; }
-  .brand-copy strong { font-size: 13px; }
+  .brand-copy { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .health-pill { width: 44px; justify-content: center; padding-inline: 8px; }
   .health-pill #health-label {
     position: absolute;
