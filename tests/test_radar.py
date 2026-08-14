@@ -334,14 +334,14 @@ class AiRadarV2Tests(unittest.TestCase):
         self.assertEqual(cheap_gpus["total"], 0)
         self.assertEqual(pod_gpus["total"], 1)
 
-    def test_priority_is_transparent_and_mainland_aware(self) -> None:
+    def test_priority_is_transparent_and_region_neutral(self) -> None:
         tier, reasons = classify_offer(observation())
         self.assertEqual(tier, "A")
         self.assertIn("无需信用卡", reasons)
         self.assertIn("周期性免费额度", reasons)
 
         tier, _ = classify_offer(observation(mainland="unsupported"))
-        self.assertEqual(tier, "C")
+        self.assertEqual(tier, "A")
         tier, _ = classify_offer(observation(verification="community"))
         self.assertEqual(tier, "D")
 
@@ -783,7 +783,7 @@ class AiRadarV2Tests(unittest.TestCase):
         self.assertEqual(result.vacuum_status, "deferred")
         self.assertEqual(result.error_code, "storage_vacuum_deferred")
 
-    def test_listing_order_prefers_mainland_supported_a_tier(self) -> None:
+    def test_listing_order_does_not_use_mainland_status(self) -> None:
         source = SOURCE_BY_ID["modal-pricing"]
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "ai.sqlite3"
@@ -813,7 +813,7 @@ class AiRadarV2Tests(unittest.TestCase):
             offers = list_offers(path)
             summary = radar_summary(path, now=NOW)
 
-        self.assertEqual(offers[0]["offer_id"], "gpu:supported")
+        self.assertEqual({offer["offer_id"] for offer in offers[:2]}, {"gpu:supported", "gpu:unknown"})
         self.assertEqual(offers[-1]["priority_tier"], "D")
         self.assertEqual(summary["counts"]["tier_a"], 2)
 

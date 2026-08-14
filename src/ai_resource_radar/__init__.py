@@ -1,6 +1,6 @@
 """Stable public facade for the deterministic AI Resource Radar core."""
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"
 
 from ai_resource_radar.interfaces.http import ApiResponse, RadarDashboardPort
 
@@ -50,6 +50,14 @@ from ai_resource_radar.provider_profiles import (
     render_integration_snippets,
 )
 from ai_resource_radar.runtime import RefreshReport, refresh
+from ai_resource_radar.regions import (
+    ISO2_CODES,
+    REGION_MODEL_VERSION,
+    REGION_PRESETS,
+    normalize_country,
+    normalize_region,
+    resolve_country_filter,
+)
 from ai_resource_radar.service import backup_database
 from ai_resource_radar.sources import (
     OfferObservation,
@@ -113,6 +121,9 @@ __all__ = [
     "OperationLockedError",
     "RadarSource",
     "RefreshReport",
+    "ISO2_CODES",
+    "REGION_MODEL_VERSION",
+    "REGION_PRESETS",
     "SOURCES",
     "diagnose",
     "backup_database",
@@ -132,6 +143,8 @@ __all__ = [
     "list_poster_models",
     "poster_benchmark_status",
     "normalize_modalities",
+    "normalize_country",
+    "normalize_region",
     "operation_lock",
     "operation_lock_status",
     "poster_configuration",
@@ -142,6 +155,7 @@ __all__ = [
     "radar_summary",
     "refresh",
     "resolve_modalities",
+    "resolve_country_filter",
     "run_doctor",
     "run_cli",
     "source_freshness_status",

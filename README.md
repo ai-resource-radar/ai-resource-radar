@@ -2,7 +2,7 @@
 
 # AI Resource Radar
 
-**Every day, verify free AI tokens, GPU compute, and price changes—see what you get and how to claim it.**
+**Daily-verified global AI APIs, GPU compute, and prices—filtered by regional availability, signup requirements, and real integration steps.**
 
 [![CI](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/ci.yml/badge.svg)](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/ci.yml)
 [![Pages](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/pages.yml/badge.svg)](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/pages.yml)
@@ -14,7 +14,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/github/license/ai-resource-radar/ai-resource-radar)](LICENSE)
 
-[Live Radar](https://ai-resource-radar.github.io/ai-resource-radar/) · [Data](https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json) · [Atom feed](https://ai-resource-radar.github.io/ai-resource-radar/feed.xml) · [RSS feed](https://ai-resource-radar.github.io/ai-resource-radar/rss.xml) · [Start with uvx](#start-with-uvx) · [中文](README.zh-CN.md)
+[Live Radar](https://ai-resource-radar.github.io/ai-resource-radar/) · [Data](https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json) · [Atom feed](https://ai-resource-radar.github.io/ai-resource-radar/en/feed.xml) · [RSS feed](https://ai-resource-radar.github.io/ai-resource-radar/en/rss.xml) · [Start with uvx](#start-with-uvx) · [中文站](https://ai-resource-radar.github.io/ai-resource-radar/zh/) · [中文 README](README.zh-CN.md)
 
 [How it works](#how-it-works) · [Public-site contract](docs/PUBLIC_SITE.md) · [Security](docs/SECURITY.md)
 
@@ -24,7 +24,7 @@
 
 *The public radar exposes a current, read-only view without requiring an account or API key.*
 
-AI Resource Radar is a local-first tracker for free AI tiers, GPU compute, grants, and prices. It
+AI Resource Radar is a global-first, local-first tracker for free AI tiers, GPU compute, grants, and prices. It
 keeps the source and verification time beside each result, so the answer is practical: **what is
 free, how much you get, when it resets, what the restrictions are, and how to claim it**.
 
@@ -43,20 +43,20 @@ uvx ai-resource-radar start --open
 For the hosted snapshot, use [Live Radar](https://ai-resource-radar.github.io/ai-resource-radar/) or fetch
 the documented [public data manifest](https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json).
 The public site is an aggregate view; always follow an official source before relying on an offer.
-Its v0.8.0 snapshot adds six bilingual scenario pages, stable Atom/RSS feeds, crawlable Chinese and
-English provider pages, conservative copyable integration examples, and on-demand catalogue loading
-while remaining static and read-only. Pages binds each build to a fresh 23-source refresh and Git
-commit.
+Its v0.9.0 snapshot makes English the global default, adds country-level availability and explicit
+signup requirements, and gives every built-in official A/B offer deterministic English and Chinese
+presentation text. The hosted snapshot remains static and read-only, and Pages binds each build to
+a fresh 23-source refresh and Git commit.
 
 ## Public scenarios, feeds, and search visibility
 
 The hosted site publishes six read-only scenario pages in both languages at
-`/zh/scenarios/<slug>/` and `/en/scenarios/<slug>/`. They turn common intents into short paths
+`/en/scenarios/<slug>/` and `/zh/scenarios/<slug>/`. They turn common intents into short paths
 through the public catalogue; they do not create an account, personalize a result, or promise that
 an offer is still available.
 
-The public change/resource stream is available as Atom at `/feed.xml` and RSS at `/rss.xml`, with
-English equivalents at `/en/feed.xml` and `/en/rss.xml`. Entries contain stable hash IDs, bounded
+The English homepage auto-discovers Atom at `/en/feed.xml` and RSS at `/en/rss.xml`; the stable root
+`/feed.xml` and `/rss.xml` addresses remain Chinese-compatible. Entries contain stable hash IDs, bounded
 public facts, observed times, and safe same-origin or official-source links. They are a convenient
 read-only snapshot, not a guarantee of quota, price, eligibility, or availability. Use GitHub Watch
 for release and maintenance updates; it is not a substitute for the daily resource feeds.
@@ -80,7 +80,7 @@ This project turns public source material into a small, explainable local databa
 
 | Capability | What you get |
 | --- | --- |
-| Free token radar | Quota, reset period, card/phone requirements, mainland status, official evidence, and claim steps |
+| Free token radar | Quota, reset period, country availability, signup requirements, official evidence, and claim steps |
 | Free GPU and grants | GPU time or credit, eligibility, expiry, limitations, and a direct official link |
 | Token price leaderboard | Input/output/cached prices normalized per 1M tokens, with sorting and filters |
 | GPU price leaderboard | On-demand GPU prices normalized per hour for practical comparison |
@@ -158,13 +158,15 @@ The radar deliberately avoids an opaque score:
 
 | Tier | Meaning |
 | --- | --- |
-| A | Officially verified, no card, recurring free quota, and no explicit mainland restriction |
+| A | Officially verified, no card, recurring free quota, and a published fixed quota |
 | B | Officially verified and no card, but quota varies or eligibility conditions apply |
-| C | Application, card, region, or one-time trial restrictions apply |
+| C | Application, card, identity, top-up, waitlist, or one-time trial restrictions apply |
 | D | Community discovery only; official verification is pending |
 
-Within a tier, results are ordered by mainland availability, estimated value, and recent changes.
-The dashboard shows the reasons instead of hiding them inside a number.
+Region never changes the A–D tier. Without a country filter, results are ordered by estimated value
+and recent changes. With a country filter, confirmed availability comes first and unknown results
+appear only when explicitly requested. The dashboard shows the reasons instead of hiding them
+inside a number.
 
 ## Optional extensions
 
@@ -215,7 +217,7 @@ Run `ai-radar <command> --help` for every filter and option.
 
 ## Data, privacy, and storage
 
-- SQLite schema v7 uses file mode `0600`; no secrets, cookies, or account data are stored.
+- SQLite schema v8 uses file mode `0600`; no secrets, cookies, or account data are stored.
 - Public scenario pages and Atom/RSS feeds contain only bounded, aggregate source facts and stable
   hash IDs; they never include local database IDs, request headers, cookies, or account data.
 - Google Search Console verification is a production build concern only. Its token is read from the

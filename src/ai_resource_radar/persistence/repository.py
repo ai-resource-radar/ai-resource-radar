@@ -13,8 +13,14 @@ from ai_resource_radar.sources import (
     OfferObservation,
     RadarSource,
     SOURCES,
+    default_presentations,
     official_guide,
     resolve_modalities,
+)
+from ai_resource_radar.regions import (
+    normalize_country,
+    parse_regions,
+    resolve_country_filter,
 )
 from .connection import connect
 from .maintenance import (
@@ -30,6 +36,85 @@ from .migrations import _decode_json_list, _json
 _VERIFICATION_RANK = {"official_api": 0, "official_page": 1, "community": 2}
 _TIER_RANK = {"A": 0, "B": 1, "C": 2, "D": 3}
 _MAINLAND_RANK = {"supported": 0, "unknown": 1, "unsupported": 2}
+_TRISTATE = {"required", "not_required", "unknown"}
+_AVAILABILITY_SCOPES = {"global", "restricted", "unknown"}
+
+
+def _availability_records(observation: OfferObservation) -> tuple[tuple[str, str], ...]:
+    """Normalize source availability while preserving legacy mainland facts."""
+
+    raw = observation.availability or (
+        {"CN": observation.mainland_status}
+        if observation.mainland_status in {"supported", "unsupported"}
+        else {}
+    )
+    if not isinstance(raw, dict):
+        raise ValueError("invalid_offer_availability")
+    records: list[tuple[str, str]] = []
+    for country, status in raw.items():
+        if not isinstance(country, str) or not isinstance(status, str):
+            raise ValueError("invalid_offer_availability")
+        code = normalize_country(country)
+        normalized_status = status.strip().casefold()
+        if normalized_status not in {"supported", "unsupported"}:
+            raise ValueError("invalid_offer_availability")
+        records.append((code, normalized_status))
+    return tuple(sorted(dict(records).items()))
+
+
+def _availability_scope(observation: OfferObservation) -> str:
+    """Infer restricted scope for legacy mainland evidence when unannotated."""
+
+    scope = observation.availability_scope
+    if scope not in _AVAILABILITY_SCOPES:
+        raise ValueError("invalid_offer_availability_scope")
+    if scope == "unknown" and _availability_records(observation):
+        return "restricted"
+    return scope
+
+
+def _presentation_records(
+    observation: OfferObservation,
+) -> tuple[tuple[str, str, str | None, str | None, str | None, str, str], ...]:
+    """Validate optional locale presentation data before persistence."""
+
+    records: list[tuple[str, str, str | None, str | None, str | None, str, str]] = []
+    presentations = observation.presentations or default_presentations(
+        provider=observation.provider,
+        title=observation.title,
+        eligibility=observation.eligibility,
+    )
+    if not isinstance(presentations, dict):
+        raise ValueError("invalid_offer_presentation")
+    for locale, item in presentations.items():
+        if not isinstance(item, dict):
+            raise ValueError("invalid_offer_presentation")
+        presentation = item.get("presentation", "default")
+        title = item.get("title")
+        benefit_summary = item.get("benefit_summary")
+        eligibility = item.get("eligibility")
+        usage_steps = item.get("usage_steps", ())
+        limitations = item.get("limitations", ())
+        if (
+            not isinstance(presentation, str)
+            or not presentation.strip()
+            or not isinstance(locale, str)
+            or not locale.strip()
+            or title is not None and not isinstance(title, str)
+            or benefit_summary is not None and not isinstance(benefit_summary, str)
+            or eligibility is not None and not isinstance(eligibility, str)
+            or not isinstance(usage_steps, (list, tuple))
+            or not isinstance(limitations, (list, tuple))
+            or not all(isinstance(value, str) for value in (*usage_steps, *limitations))
+        ):
+            raise ValueError("invalid_offer_presentation")
+        records.append(
+            (
+                presentation[:80], locale[:35], title, benefit_summary, eligibility,
+                _json(list(usage_steps)), _json(list(limitations)),
+            )
+        )
+    return tuple(records)
 def source_cache(
     connection: sqlite3.Connection, source_id: str
 ) -> sqlite3.Row | None:
@@ -201,12 +286,6 @@ def classify_offer(observation: OfferObservation) -> tuple[str, tuple[str, ...]]
         reasons.append("需要信用卡")
     else:
         reasons.append("信用卡要求待确认")
-    if observation.mainland_status == "supported":
-        reasons.append("官方信息未显示中国大陆限制")
-    elif observation.mainland_status == "unsupported":
-        reasons.append("中国大陆不在官方支持范围")
-    else:
-        reasons.append("中国大陆可用性待确认")
     if observation.offer_type == "recurring_free":
         reasons.append("周期性免费额度")
     elif observation.offer_type == "variable_free":
@@ -219,12 +298,10 @@ def classify_offer(observation: OfferObservation) -> tuple[str, tuple[str, ...]]
         observation.requires_card == "no"
         and observation.offer_type == "recurring_free"
         and observation.quota_value is not None
-        and observation.mainland_status != "unsupported"
     ):
         return "A", tuple(reasons)
     if (
         observation.requires_card == "no"
-        and observation.mainland_status != "unsupported"
         and observation.offer_type in {"recurring_free", "variable_free"}
     ):
         return "B", tuple(reasons)
@@ -234,6 +311,9 @@ def classify_offer(observation: OfferObservation) -> tuple[str, tuple[str, ...]]
 def _offer_payload(
     observation: OfferObservation, tier: str, reasons: tuple[str, ...]
 ) -> dict[str, Any]:
+    availability_scope = _availability_scope(observation)
+    if any(value not in _TRISTATE for value in observation.signup_requirements().values()):
+        raise ValueError("invalid_signup_requirement")
     input_modalities, output_modalities = resolve_modalities(
         observation.details,
         input_modalities=observation.input_modalities,
@@ -256,8 +336,15 @@ def _offer_payload(
         "estimated_usd_value": observation.estimated_usd_value,
         "requires_card": observation.requires_card,
         "requires_phone": observation.requires_phone,
+        "requires_identity_verification": observation.requires_identity_verification,
+        "requires_paid_topup": observation.requires_paid_topup,
+        "requires_waitlist": observation.requires_waitlist,
+        "requires_organization": observation.requires_organization,
+        "signup_requirements": observation.signup_requirements(),
         "eligibility": observation.eligibility,
         "mainland_status": observation.mainland_status,
+        "availability_scope": availability_scope,
+        "availability": dict(_availability_records(observation)),
         "expires_at": observation.expires_at,
         "homepage_url": observation.homepage_url,
         "verification_level": observation.verification_level,
@@ -362,8 +449,13 @@ def ingest_source(
                         "estimated_usd_value",
                         "requires_card",
                         "requires_phone",
+                        "requires_identity_verification",
+                        "requires_paid_topup",
+                        "requires_waitlist",
+                        "requires_organization",
                         "eligibility",
                         "mainland_status",
+                        "availability_scope",
                         "expires_at",
                         "homepage_url",
                         "verification_level",
@@ -379,6 +471,22 @@ def ingest_source(
                 before["free_image_generation"] = bool(
                     current["free_image_generation"]
                 )
+                before["signup_requirements"] = {
+                    "card": {"yes": "required", "no": "not_required"}.get(current["requires_card"], "unknown"),
+                    "phone": {"yes": "required", "no": "not_required"}.get(current["requires_phone"], "unknown"),
+                    "identity_verification": current["requires_identity_verification"],
+                    "paid_topup": current["requires_paid_topup"],
+                    "waitlist": current["requires_waitlist"],
+                    "organization": current["requires_organization"],
+                }
+                before["availability"] = {
+                    row["country_code"]: row["availability_status"]
+                    for row in connection.execute(
+                        "SELECT country_code, availability_status FROM offer_availability "
+                        "WHERE offer_id = ? ORDER BY country_code",
+                        (offer_id,),
+                    )
+                }
                 fields = _changed_fields(before, payload)
                 if fields:
                     updated += 1
@@ -395,7 +503,9 @@ def ingest_source(
                     INSERT INTO offers(
                         offer_id, provider, title, kind, offer_type, quota_value,
                         quota_unit, reset_period, estimated_usd_value, requires_card,
-                        requires_phone, eligibility, mainland_status, expires_at,
+                        requires_phone, requires_identity_verification,
+                        requires_paid_topup, requires_waitlist, requires_organization, eligibility,
+                        mainland_status, availability_scope, expires_at,
                         homepage_url, verification_level, priority_tier,
                         priority_reasons_json, details_json, input_modalities_json,
                         output_modalities_json, free_image_generation, fingerprint,
@@ -403,7 +513,7 @@ def ingest_source(
                         first_seen_at, last_seen_at, last_changed_at
                     )
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                            ?, ?, ?,
+                            ?, ?, ?, ?, ?, ?, ?, ?,
                             'active', ?, ?, ?)
                     """,
                     (
@@ -418,8 +528,13 @@ def ingest_source(
                         observation.estimated_usd_value,
                         observation.requires_card,
                         observation.requires_phone,
+                        observation.requires_identity_verification,
+                        observation.requires_paid_topup,
+                        observation.requires_waitlist,
+                        observation.requires_organization,
                         observation.eligibility,
                         observation.mainland_status,
+                        payload["availability_scope"],
                         observation.expires_at,
                         observation.homepage_url,
                         observation.verification_level,
@@ -442,8 +557,11 @@ def ingest_source(
                         provider = ?, title = ?, kind = ?, offer_type = ?,
                         quota_value = ?, quota_unit = ?, reset_period = ?,
                         estimated_usd_value = ?, requires_card = ?,
-                        requires_phone = ?, eligibility = ?, mainland_status = ?,
-                        expires_at = ?, homepage_url = ?, verification_level = ?,
+                        requires_phone = ?, requires_identity_verification = ?,
+                        requires_paid_topup = ?, requires_waitlist = ?,
+                        requires_organization = ?, eligibility = ?,
+                        mainland_status = ?, availability_scope = ?, expires_at = ?,
+                        homepage_url = ?, verification_level = ?,
                         priority_tier = ?, priority_reasons_json = ?,
                         details_json = ?, input_modalities_json = ?,
                         output_modalities_json = ?, free_image_generation = ?,
@@ -464,8 +582,13 @@ def ingest_source(
                         observation.estimated_usd_value,
                         observation.requires_card,
                         observation.requires_phone,
+                        observation.requires_identity_verification,
+                        observation.requires_paid_topup,
+                        observation.requires_waitlist,
+                        observation.requires_organization,
                         observation.eligibility,
                         observation.mainland_status,
+                        payload["availability_scope"],
                         observation.expires_at,
                         observation.homepage_url,
                         observation.verification_level,
@@ -486,6 +609,47 @@ def ingest_source(
                 connection.execute(
                     "UPDATE offers SET last_seen_at = ? WHERE offer_id = ?",
                     (at, offer_id),
+                )
+            if can_replace:
+                connection.execute(
+                    "DELETE FROM offer_availability WHERE offer_id = ?", (offer_id,)
+                )
+                connection.executemany(
+                    """
+                    INSERT INTO offer_availability(
+                        offer_id, country_code, availability_status, source_url,
+                        evidence_excerpt, observed_at
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    [
+                        (
+                            offer_id,
+                            country,
+                            status,
+                            observation.source_url,
+                            observation.evidence_excerpt[:500],
+                            at,
+                        )
+                        for country, status in _availability_records(observation)
+                    ],
+                )
+                connection.execute(
+                    "DELETE FROM offer_presentations WHERE offer_id = ?", (offer_id,)
+                )
+                connection.executemany(
+                    """
+                    INSERT INTO offer_presentations(
+                        offer_id, presentation, locale, title, benefit_summary,
+                        eligibility, usage_steps_json, limitations_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    [
+                        (offer_id, presentation, locale, title, benefit_summary,
+                         eligibility, usage_steps_json, limitations_json)
+                        for (presentation, locale, title, benefit_summary,
+                             eligibility, usage_steps_json, limitations_json)
+                        in _presentation_records(observation)
+                    ],
                 )
             evidence_payload = {
                 "source_url": observation.source_url,
@@ -675,7 +839,14 @@ def enqueue_digest(connection: sqlite3.Connection, *, at: str) -> int | None:
     return notification_id
 
 
-def _offer_dict(connection: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
+def _offer_dict(
+    connection: sqlite3.Connection,
+    row: sqlite3.Row,
+    *,
+    locale: str = "en",
+    availability_context: tuple[str, ...] = (),
+    strict_region: bool = False,
+) -> dict[str, Any]:
     evidence = connection.execute(
         """
         SELECT source_id, source_url, verification_level, evidence_excerpt, observed_at
@@ -713,6 +884,76 @@ def _offer_dict(connection: sqlite3.Connection, row: sqlite3.Row) -> dict[str, A
         and str(row["offer_type"]) in {"recurring_free", "variable_free"}
         and "image" in resolved_outputs
     )
+    availability_rows = connection.execute(
+        """
+        SELECT country_code, availability_status, source_url, evidence_excerpt,
+               observed_at FROM offer_availability
+        WHERE offer_id = ? ORDER BY country_code
+        """,
+        (row["offer_id"],),
+    ).fetchall()
+    supported_countries = [
+        item["country_code"]
+        for item in availability_rows
+        if item["availability_status"] == "supported"
+    ]
+    unsupported_countries = [
+        item["country_code"]
+        for item in availability_rows
+        if item["availability_status"] == "unsupported"
+    ]
+    availability_status: str | None = None
+    if availability_context:
+        context = set(availability_context)
+        if context & set(unsupported_countries):
+            availability_status = "unsupported"
+        elif strict_region:
+            if context <= set(supported_countries):
+                availability_status = "supported"
+            elif row["availability_scope"] == "global":
+                availability_status = "supported"
+            else:
+                availability_status = "unknown"
+        elif context & set(supported_countries):
+            availability_status = "supported"
+        elif row["availability_scope"] == "global":
+            availability_status = "supported"
+        else:
+            availability_status = "unknown"
+    availability = {
+        "scope": row["availability_scope"],
+        "supported_countries": supported_countries,
+        "unsupported_countries": unsupported_countries,
+        "evidence": [
+            {
+                "country_code": item["country_code"],
+                "status": item["availability_status"],
+                "source_url": item["source_url"],
+                "evidence_excerpt": item["evidence_excerpt"],
+                "verified_at": item["observed_at"],
+            }
+            for item in availability_rows
+        ],
+    }
+    presentations = {
+        item["locale"]: {
+            "presentation": item["presentation"],
+            "title": item["title"],
+            "benefit_summary": item["benefit_summary"],
+            "eligibility": item["eligibility"],
+            "usage_steps": json.loads(item["usage_steps_json"]),
+            "limitations": json.loads(item["limitations_json"]),
+        }
+        for item in connection.execute(
+            """
+            SELECT presentation, locale, title, benefit_summary, eligibility,
+                   usage_steps_json, limitations_json FROM offer_presentations
+            WHERE offer_id = ? ORDER BY locale, presentation
+            """,
+            (row["offer_id"],),
+        )
+    }
+    presentation = presentations.get(locale) or presentations.get("en")
     return {
         "offer_id": row["offer_id"],
         "external_id": row["offer_id"],
@@ -726,8 +967,23 @@ def _offer_dict(connection: sqlite3.Connection, row: sqlite3.Row) -> dict[str, A
         "estimated_usd_value": row["estimated_usd_value"],
         "requires_card": row["requires_card"],
         "requires_phone": row["requires_phone"],
+        "requires_identity_verification": row["requires_identity_verification"],
+        "requires_paid_topup": row["requires_paid_topup"],
+        "requires_waitlist": row["requires_waitlist"],
+        "requires_organization": row["requires_organization"],
+        "signup_requirements": {
+            "card": {"yes": "required", "no": "not_required"}.get(row["requires_card"], "unknown"),
+            "phone": {"yes": "required", "no": "not_required"}.get(row["requires_phone"], "unknown"),
+            "identity_verification": row["requires_identity_verification"],
+            "paid_topup": row["requires_paid_topup"],
+            "waitlist": row["requires_waitlist"],
+            "organization": row["requires_organization"],
+        },
         "eligibility": row["eligibility"],
         "mainland_status": row["mainland_status"],
+        "availability_scope": row["availability_scope"],
+        "availability": availability,
+        "availability_status": availability_status,
         "expires_at": row["expires_at"],
         "homepage_url": row["homepage_url"],
         "url": row["homepage_url"],
@@ -739,6 +995,8 @@ def _offer_dict(connection: sqlite3.Connection, row: sqlite3.Row) -> dict[str, A
         "output_modalities": list(resolved_outputs),
         "free_image_generation": free_image_generation,
         "details": details,
+        "presentations": presentations,
+        "presentation": presentation,
         "status": row["status"],
         "first_seen_at": row["first_seen_at"],
         "last_seen_at": row["last_seen_at"],
@@ -754,6 +1012,10 @@ def list_offers(
     verified_only: bool = False,
     no_card: bool = False,
     mainland: tuple[str, ...] | None = None,
+    country: str | tuple[str, ...] | None = None,
+    region: str | tuple[str, ...] | None = None,
+    include_unknown_region: bool = False,
+    locale: str = "en",
     query: str | None = None,
     free_image_generation: bool = False,
     limit: int = 100,
@@ -765,6 +1027,14 @@ def list_offers(
         raise ValueError("invalid_offer_pagination")
     if kind is not None and kind not in {"token", "gpu", "grant"}:
         raise ValueError("invalid_offer_kind")
+    if not isinstance(include_unknown_region, bool):
+        raise ValueError("invalid_region_filter")
+    if not isinstance(locale, str) or not locale.strip() or len(locale) > 35:
+        raise ValueError("invalid_offer_locale")
+    countries = resolve_country_filter(country=country, region=region)
+    region_countries = parse_regions(region) if region is not None else ()
+    if mainland and (country is not None or region is not None):
+        raise ValueError("country_region_mainland_mutually_exclusive")
     if not path.exists():
         return ()
     connection = connect(path)
@@ -790,21 +1060,102 @@ def list_offers(
                 raise ValueError("invalid_mainland_filter")
             clauses.append(f"mainland_status IN ({','.join('?' for _ in valid)})")
             parameters.extend(valid)
+        if countries and region_countries:
+            country_marks = ",".join("?" for _ in countries)
+            no_unsupported = (
+                "NOT EXISTS (SELECT 1 FROM offer_availability availability "
+                "WHERE availability.offer_id = offers.offer_id "
+                f"AND availability.country_code IN ({country_marks}) "
+                "AND availability.availability_status = 'unsupported')"
+            )
+            all_supported = (
+                "(SELECT COUNT(DISTINCT availability.country_code) "
+                "FROM offer_availability availability "
+                "WHERE availability.offer_id = offers.offer_id "
+                f"AND availability.country_code IN ({country_marks}) "
+                "AND availability.availability_status = 'supported') = ?"
+            )
+            if include_unknown_region:
+                clauses.append(f"({no_unsupported})")
+                parameters.extend(countries)
+            else:
+                clauses.append(
+                    f"({no_unsupported} AND (availability_scope = 'global' OR {all_supported}))"
+                )
+                parameters.extend(countries)
+                parameters.extend(countries)
+                parameters.append(len(countries))
+        elif countries:
+            # Unknown country availability is represented by no row.  It can
+            # only be included on explicit request, never by a default filter.
+            country_marks = ",".join("?" for _ in countries)
+            if include_unknown_region:
+                clauses.append(
+                    "(NOT EXISTS ("
+                    "SELECT 1 FROM offer_availability availability "
+                    "WHERE availability.offer_id = offers.offer_id "
+                    f"AND availability.country_code IN ({country_marks}) "
+                    "AND availability.availability_status = 'unsupported'))"
+                )
+            else:
+                clauses.append(
+                    "(NOT EXISTS (SELECT 1 FROM offer_availability availability "
+                    "WHERE availability.offer_id = offers.offer_id "
+                    f"AND availability.country_code IN ({country_marks}) "
+                    "AND availability.availability_status = 'unsupported') AND ("
+                    "EXISTS ("
+                    "SELECT 1 FROM offer_availability availability "
+                    "WHERE availability.offer_id = offers.offer_id "
+                    f"AND availability.country_code IN ({country_marks}) "
+                    "AND availability.availability_status = 'supported') "
+                    "OR availability_scope = 'global'))"
+                )
+                parameters.extend(countries)
+            parameters.extend(countries)
         if query:
             clauses.append("(provider LIKE ? OR title LIKE ?)")
             token = f"%{query[:100]}%"
             parameters.extend((token, token))
+        availability_order = ""
+        if countries:
+            country_literals = ",".join(f"'{code}'" for code in countries)
+            unsupported = (
+                "NOT EXISTS (SELECT 1 FROM offer_availability availability "
+                "WHERE availability.offer_id = offers.offer_id "
+                f"AND availability.country_code IN ({country_literals}) "
+                "AND availability.availability_status = 'unsupported')"
+            )
+            if region_countries:
+                supported = (
+                    "(SELECT COUNT(DISTINCT availability.country_code) "
+                    "FROM offer_availability availability "
+                    "WHERE availability.offer_id = offers.offer_id "
+                    f"AND availability.country_code IN ({country_literals}) "
+                    "AND availability.availability_status = 'supported') = "
+                    f"{len(countries)}"
+                )
+            else:
+                supported = (
+                    "EXISTS (SELECT 1 FROM offer_availability availability "
+                    "WHERE availability.offer_id = offers.offer_id "
+                    f"AND availability.country_code IN ({country_literals}) "
+                    "AND availability.availability_status = 'supported')"
+                )
+            availability_order = (
+                f"CASE WHEN {supported} THEN 0 "
+                f"WHEN availability_scope = 'global' AND {unsupported} THEN 1 "
+                "ELSE 2 END,\n                "
+            )
         parameters.extend((limit, offset))
         rows = connection.execute(
             f"""
             SELECT * FROM offers
             WHERE {' AND '.join(clauses)}
             ORDER BY
+                {availability_order}
                 CASE priority_tier
                     WHEN 'A' THEN 0 WHEN 'B' THEN 1
                     WHEN 'C' THEN 2 ELSE 3 END,
-                CASE mainland_status
-                    WHEN 'supported' THEN 0 WHEN 'unknown' THEN 1 ELSE 2 END,
                 CASE requires_card
                     WHEN 'no' THEN 0 WHEN 'unknown' THEN 1 ELSE 2 END,
                 COALESCE(estimated_usd_value, -1) DESC,
@@ -815,7 +1166,16 @@ def list_offers(
             """,
             parameters,
         ).fetchall()
-        return tuple(_offer_dict(connection, row) for row in rows)
+        return tuple(
+            _offer_dict(
+                connection,
+                row,
+                locale=locale.strip(),
+                availability_context=countries,
+                strict_region=bool(region_countries),
+            )
+            for row in rows
+        )
     finally:
         connection.close()
 

@@ -17,6 +17,11 @@ const LABELS = {
   },
 };
 
+const AVAILABILITY_LABELS = {
+  "zh-CN": { supported: "所选地区已确认支持", unsupported: "所选地区明确不支持", unknown: "所选地区待确认", unfiltered: "未按地区筛选", global: "全球可用" },
+  en: { supported: "Confirmed in selected region", unsupported: "Unavailable in selected region", unknown: "Region availability unknown", unfiltered: "No region filter", global: "Global availability" },
+};
+
 function labels(locale) { return LABELS[locale === "en" ? "en" : "zh-CN"]; }
 
 export function textValue(value, fallback = "—") {
@@ -62,15 +67,22 @@ export function mainlandLabel(value, locale = "zh-CN") {
   return labels(locale)[value] || labels(locale).unknown;
 }
 
+export function availabilityLabel(value, locale = "zh-CN", scope = "unknown") {
+  const copy = AVAILABILITY_LABELS[locale === "en" ? "en" : "zh-CN"];
+  if ((!value || value === "unfiltered") && scope === "global") return copy.global;
+  return copy[value] || copy.unfiltered;
+}
+
 export function cardLabel(value, locale = "zh-CN") {
   const copy = labels(locale);
   return value === "no" ? copy.noCard : value === "yes" ? copy.card : copy.cardUnknown;
 }
 
 export function presentationFor(resource, locale = "zh-CN") {
-  const publicPresentation = resource?.presentation;
+  const publicPresentation = resource?.presentations || resource?.presentation;
   if (publicPresentation && typeof publicPresentation === "object") {
-    return publicPresentation[locale] || publicPresentation.en || publicPresentation["zh-CN"] || {};
+    if (locale === "en") return publicPresentation.en || {};
+    return publicPresentation[locale] || publicPresentation["zh-CN"] || publicPresentation.en || {};
   }
   return resource?.details && typeof resource.details === "object" ? resource.details : {};
 }
@@ -94,7 +106,8 @@ export function quotaText(resource, locale = "zh-CN") {
 
 export function benefitSummary(resource, locale = "zh-CN") {
   const presentation = presentationFor(resource, locale);
-  return presentation.benefit_summary || resource?.eligibility || `${quotaText(resource, locale)} ${locale === "en" ? "free" : "免费额度"}`;
+  const fallbackEligibility = locale === "en" ? "" : resource?.eligibility;
+  return presentation.benefit_summary || fallbackEligibility || `${quotaText(resource, locale)} ${locale === "en" ? "free" : "免费额度"}`;
 }
 
 export function usageSteps(resource, locale = "zh-CN") {
@@ -103,7 +116,8 @@ export function usageSteps(resource, locale = "zh-CN") {
 }
 
 export function caveats(resource, locale = "zh-CN") {
-  const items = presentationFor(resource, locale).caveats;
+  const presentation = presentationFor(resource, locale);
+  const items = presentation.limitations || presentation.caveats;
   return Array.isArray(items) ? items.filter((item) => typeof item === "string" && item.trim()) : [];
 }
 

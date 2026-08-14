@@ -19,7 +19,7 @@ const DATA = {
   gpuPrices: "data/gpu-prices.json",
   changes: "data/changes.json",
 };
-const PUBLIC_VERSION = "0.8.0";
+const PUBLIC_VERSION = "0.9.0";
 const PAGE_SIZE = 20;
 const RESOURCE_VIEWS = new Set(["recommended", "token", "gpu", "grant"]);
 const PRICE_VIEWS = new Set(["token-prices", "gpu-prices"]);
@@ -29,6 +29,11 @@ const INITIAL_DATASETS = ["manifest", "summary", "sources", "featured", "importa
 const VIEW_DATASET = {
   token: "resources", gpu: "resources", grant: "resources",
   "token-prices": "tokenPrices", "gpu-prices": "gpuPrices",
+};
+const FALLBACK_REGION_PRESETS = {
+  "eu-eea": ["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IS", "IE", "IT", "LV", "LI", "LT", "LU", "MT", "NL", "NO", "PL", "PT", "RO", "SK", "SI", "ES", "SE"],
+  "southeast-asia": ["BN", "KH", "ID", "LA", "MY", "MM", "PH", "SG", "TH", "TL", "VN"],
+  us: ["US"], uk: ["GB"], india: ["IN"], china: ["CN"],
 };
 
 const COPY = {
@@ -41,17 +46,18 @@ const COPY = {
     "hero.description": "额度、门槛、领取步骤和官方证据一次看清。", "hero.updated": "数据核验时间",
     "featured.kicker": "TODAY'S PICKS", "featured.title": "今天最值得领", "featured.note": "不同供应商 · 无需信用卡优先",
     "changes.kicker": "VERIFIED CHANGES", "changes.title": "最近重要变化",
-    "catalog.kicker": "CATALOGUE", "catalog.title": "完整资源目录", "catalog.caption": "按供应商、核验、信用卡和大陆状态筛选。",
+    "catalog.kicker": "CATALOGUE", "catalog.title": "完整资源目录", "catalog.caption": "按供应商、核验、注册门槛和国家可用性筛选。",
     "download.json": "下载 JSON", "download.csv": "下载 CSV", "filters.search": "搜索",
     "filters.searchPlaceholder": "供应商、模型或关键词", "filters.provider": "供应商", "filters.allProviders": "全部供应商",
     "filters.verification": "核验", "filters.all": "全部", "filters.official": "仅官方", "filters.community": "社区或待核验",
     "filters.card": "信用卡", "filters.noCard": "无需信用卡", "filters.cardRequired": "需要或待确认",
-    "filters.mainland": "大陆状态", "filters.supported": "可用", "filters.unknown": "待确认", "filters.unsupported": "不支持",
+    "filters.country": "国家代码", "filters.region": "区域预设", "filters.noRegion": "不选择区域",
+    "filters.includeUnknownRegion": "包括地区未知", "filters.regionNote": "国家与区域互斥；默认只显示已确认支持的资源。",
     "filters.sort": "排序", "filters.clear": "清除筛选", "sort.recommended": "推荐度", "sort.updated": "更新时间",
     "sort.price": "价格从低", "sort.provider": "供应商", "status.loading": "正在读取公开数据…",
     "pager.previous": "上一页", "pager.next": "下一页", "footer.readOnly": "公开只读目录，不会代你注册、提交或读取账号。",
     "footer.changes": "变化数据", "footer.health": "来源健康", "footer.github": "GitHub 源码",
-    freeCount: "免费资源", priceCount: "价格条目", sourceCount: "新鲜来源", imageCount: "免费生图",
+    freeCount: "目录总数", officialCount: "官方核验", communityCount: "社区候选", sourceCount: "新鲜来源",
     loaded: "显示", noData: "当前条件下没有结果。", page: "第 {page} / {pages} 页", healthFresh: "来源新鲜",
     healthPartial: "部分来源需复核", fresh: "新鲜", overdue: "逾期", failed: "失败", pending: "待复核", stale: "陈旧", never: "未采集",
     input: "输入 / 百万", output: "输出 / 百万", typical: "典型成本", gpu: "GPU", hourly: "每小时", vram: "显存",
@@ -68,17 +74,18 @@ const COPY = {
     "hero.description": "See the quota, requirements, claim steps, and official evidence together.", "hero.updated": "Data verified",
     "featured.kicker": "TODAY'S PICKS", "featured.title": "Best resources to claim", "featured.note": "Different providers · no-card first",
     "changes.kicker": "VERIFIED CHANGES", "changes.title": "Important recent changes",
-    "catalog.kicker": "CATALOGUE", "catalog.title": "Complete resource directory", "catalog.caption": "Filter by provider, verification, card, and mainland availability.",
+    "catalog.kicker": "CATALOGUE", "catalog.title": "Complete resource directory", "catalog.caption": "Filter by provider, verification, signup requirements, and country availability.",
     "download.json": "Download JSON", "download.csv": "Download CSV", "filters.search": "Search",
     "filters.searchPlaceholder": "Provider, model, or keyword", "filters.provider": "Provider", "filters.allProviders": "All providers",
     "filters.verification": "Verification", "filters.all": "All", "filters.official": "Official only", "filters.community": "Community or pending",
     "filters.card": "Card", "filters.noCard": "No card", "filters.cardRequired": "Required or unknown",
-    "filters.mainland": "Mainland", "filters.supported": "Supported", "filters.unknown": "Unknown", "filters.unsupported": "Unavailable",
+    "filters.country": "Country", "filters.region": "Region preset", "filters.noRegion": "No region",
+    "filters.includeUnknownRegion": "Include unknown availability", "filters.regionNote": "Country and region are mutually exclusive. Confirmed support is required by default.",
     "filters.sort": "Sort", "filters.clear": "Clear filters", "sort.recommended": "Recommended", "sort.updated": "Updated",
     "sort.price": "Lowest price", "sort.provider": "Provider", "status.loading": "Loading public data…",
     "pager.previous": "Previous", "pager.next": "Next", "footer.readOnly": "Public read-only directory. It never registers, submits, or reads accounts.",
     "footer.changes": "Change data", "footer.health": "Source health", "footer.github": "GitHub source",
-    freeCount: "Free resources", priceCount: "Price rows", sourceCount: "Fresh sources", imageCount: "Free image APIs",
+    freeCount: "Catalogue total", officialCount: "Officially verified", communityCount: "Community candidates", sourceCount: "Fresh sources",
     loaded: "Showing", noData: "No results match these filters.", page: "Page {page} / {pages}", healthFresh: "Sources fresh",
     healthPartial: "Some sources need review", fresh: "Fresh", overdue: "Overdue", failed: "Failed", pending: "Pending", stale: "Stale", never: "Never",
     input: "Input / 1M", output: "Output / 1M", typical: "Typical cost", gpu: "GPU", hourly: "Hourly", vram: "VRAM",
@@ -89,7 +96,7 @@ const COPY = {
 };
 
 const state = {
-  locale: "zh-CN", group: "free", view: "recommended", page: 1,
+  locale: "en", group: "free", view: "recommended", page: 1,
   data: {}, rows: [], filtered: [], routeSequence: 0, loadingKey: "",
 };
 // Keep each exported dataset in memory for the current page session. A request
@@ -116,15 +123,21 @@ function changeLabel(value) {
 
 function readRoute() {
   const params = new URLSearchParams(location.search);
+  // Language lives in the canonical path.  A legacy `lang` query is accepted
+  // for one read but is removed on the next route write.
+  const requestedLocale = params.get("lang");
+  state.locale = /\/zh\/?$/.test(location.pathname) || requestedLocale === "zh-CN" ? "zh-CN" : "en";
   const requested = params.get("view") || params.get("tab") || "recommended";
   state.view = KNOWN_VIEWS.has(requested) ? requested : "recommended";
   state.group = groupFor(state.view);
   state.page = Math.max(1, Number.parseInt(params.get("page") || "1", 10) || 1);
   $("search-input").value = params.get("q") || "";
-  for (const [id, key] of [["provider-filter", "provider"], ["verification-filter", "verification"], ["card-filter", "card"], ["mainland-filter", "mainland"], ["sort-filter", "sort"]]) {
+  for (const [id, key] of [["provider-filter", "provider"], ["verification-filter", "verification"], ["card-filter", "card"], ["region-filter", "region"], ["sort-filter", "sort"]]) {
     const value = params.get(key);
     if (value && [...$(id).options].some((option) => option.value === value)) $(id).value = value;
   }
+  $("country-filter").value = String(params.get("country") || "").trim().toUpperCase().slice(0, 2);
+  $("include-unknown-region").checked = params.get("include_unknown") === "true";
   if (!params.has("sort")) $("sort-filter").value = defaultSort();
   state.routeSequence += 1;
 }
@@ -132,15 +145,65 @@ function readRoute() {
 function writeRoute() {
   const url = new URL(location.href);
   url.search = "";
+  // Locale is deliberately URL state.  Do not profile visitors or persist a
+  // preference in cookies or browser storage: a copied URL always renders the same
+  // language.
+  url.searchParams.delete("lang");
   if (state.view !== "recommended") url.searchParams.set("view", state.view);
   const query = $("search-input").value.trim();
   if (query) url.searchParams.set("q", query);
   if (state.page > 1) url.searchParams.set("page", String(state.page));
-  for (const [id, key, defaults] of [["provider-filter", "provider", [""]], ["verification-filter", "verification", ["all"]], ["card-filter", "card", ["all"]], ["mainland-filter", "mainland", ["all"]], ["sort-filter", "sort", [defaultSort()]]]) {
+  for (const [id, key, defaults] of [["provider-filter", "provider", [""]], ["verification-filter", "verification", ["all"]], ["card-filter", "card", ["all"]], ["region-filter", "region", [""]], ["sort-filter", "sort", [defaultSort()]]]) {
     const value = $(id).value;
     if (!defaults.includes(value)) url.searchParams.set(key, value);
   }
+  const country = $("country-filter").value.trim().toUpperCase();
+  if (country) url.searchParams.set("country", country);
+  if ($("include-unknown-region").checked && (country || $("region-filter").value)) url.searchParams.set("include_unknown", "true");
   history.replaceState(null, "", `${url.pathname}${url.search}`);
+}
+
+function availabilityFacts(row) {
+  const raw = row?.availability && typeof row.availability === "object" ? row.availability : {};
+  const scope = row?.availability_scope || raw.scope || "unknown";
+  const supported = new Set(Array.isArray(raw.supported_countries) ? raw.supported_countries : []);
+  const unsupported = new Set(Array.isArray(raw.unsupported_countries) ? raw.unsupported_countries : []);
+  // Compatibility with early v0.9 snapshots that exported a country->status map.
+  for (const [key, value] of Object.entries(raw)) {
+    if (!/^[A-Z]{2}$/.test(key)) continue;
+    if (value === "supported") supported.add(key);
+    if (value === "unsupported") unsupported.add(key);
+  }
+  return { scope, supported, unsupported };
+}
+
+function selectedCountries() {
+  const country = $("country-filter").value.trim().toUpperCase();
+  if (country) return /^[A-Z]{2}$/.test(country) ? [country] : [];
+  const region = $("region-filter").value;
+  const presets = state.data.manifest?.region_presets || FALLBACK_REGION_PRESETS;
+  return Array.isArray(presets?.[region]) ? presets[region] : (FALLBACK_REGION_PRESETS[region] || []);
+}
+
+function availabilityStatus(row) {
+  const countries = selectedCountries();
+  if (!countries.length) return "unfiltered";
+  const facts = availabilityFacts(row);
+  const statuses = countries.map((country) => {
+    if (facts.unsupported.has(country)) return "unsupported";
+    if (facts.supported.has(country)) return "supported";
+    if (facts.scope === "global") return "supported";
+    return "unknown";
+  });
+  if (statuses.includes("unsupported")) return "unsupported";
+  if (statuses.every((status) => status === "supported")) return "supported";
+  return "unknown";
+}
+
+function matchesSelectedAvailability(row) {
+  const status = availabilityStatus(row);
+  if (status === "unfiltered" || status === "supported") return true;
+  return status === "unknown" && $("include-unknown-region").checked;
 }
 
 function recommendedRows(resources) {
@@ -149,7 +212,7 @@ function recommendedRows(resources) {
     ["official_api", "official_page"].includes(row.verification_level)
     && ["A", "B"].includes(row.priority_tier)
     && row.requires_card === "no"
-    && ["supported", "unknown"].includes(row.mainland_status)
+    && matchesSelectedAvailability(row)
   )).filter((row) => {
     const provider = String(row.provider_slug || row.provider || "").toLowerCase();
     if (seen.has(provider)) return false;
@@ -172,8 +235,10 @@ function sortRows(rows) {
     if (mode === "price") return Number(a.typical_cost ?? a.hourly_usd ?? Infinity) - Number(b.typical_cost ?? b.hourly_usd ?? Infinity);
     if (mode === "provider") return textValue(a.provider).localeCompare(textValue(b.provider), state.locale);
     if (mode === "updated") return textValue(b.last_changed_at || b.verified_at).localeCompare(textValue(a.last_changed_at || a.verified_at));
-    return priority(a) - priority(b)
-      || Number(b.mainland_status === "supported") - Number(a.mainland_status === "supported")
+    const geography = selectedCountries().length
+      ? Number(availabilityStatus(b) === "supported") - Number(availabilityStatus(a) === "supported")
+      : 0;
+    return geography || priority(a) - priority(b)
       || textValue(a.provider).localeCompare(textValue(b.provider), state.locale);
   });
 }
@@ -183,7 +248,6 @@ function filteredRows() {
   const provider = $("provider-filter").value;
   const verification = $("verification-filter").value;
   const card = $("card-filter").value;
-  const mainland = $("mainland-filter").value;
   state.filtered = sortRows(currentRows().filter((row) => {
     const searchable = `${row.provider || ""} ${row.provider_slug || ""} ${row.title || ""} ${row.model || ""} ${row.gpu_model || ""}`.toLowerCase();
     if (query && !searchable.includes(query)) return false;
@@ -194,7 +258,7 @@ function filteredRows() {
       if (verification === "community" && official) return false;
       if (card === "no" && row.requires_card !== "no") return false;
       if (card === "yes" && row.requires_card === "no") return false;
-      if (mainland !== "all" && row.mainland_status !== mainland) return false;
+      if (!matchesSelectedAvailability(row)) return false;
     }
     return true;
   }));
@@ -206,13 +270,11 @@ function renderSummary() {
   root.replaceChildren();
   const manifest = state.data.manifest || {};
   const counts = manifest.counts || {};
-  const resources = items(state.data.resources);
-  const imageCount = counts.free_image_generation ?? counts.image_generation ?? (state.data.resources ? resources.filter((row) => row.free_image_generation).length : 0);
   const metrics = [
-    [t("freeCount"), counts.resources, state.locale === "en" ? "public policy entries" : "公开政策条目"],
-    [t("priceCount"), Number(counts.token_prices || 0) + Number(counts.gpu_prices || 0), state.locale === "en" ? "normalized rows" : "统一价格口径"],
-    [t("sourceCount"), `${manifest.source_health?.fresh || 0}/${manifest.source_health?.total || 0}`, state.locale === "en" ? "official + community" : "官方与社区来源"],
-    [t("imageCount"), imageCount, state.locale === "en" ? "officially verified" : "官方核验"],
+    [t("freeCount"), counts.resources, state.locale === "en" ? "active public entries" : "当前有效公开条目"],
+    [t("officialCount"), counts.official_verified_resources, state.locale === "en" ? "official API or page" : "官方 API 或页面"],
+    [t("communityCount"), counts.community_candidates, state.locale === "en" ? "never promoted to official" : "不会冒充官方核验"],
+    [t("sourceCount"), `${manifest.source_health?.fresh || 0}/${manifest.source_health?.total || 0}`, state.locale === "en" ? "official + community sources" : "官方与社区来源"],
   ];
   for (const [label, value, note] of metrics) {
     const card = element("article", "summary-card");
@@ -258,7 +320,7 @@ function renderFeatured() {
   if (!show) return;
   const root = $("featured-resources");
   root.replaceChildren();
-  recommendedRows(items(state.data.featured)).slice(0, 3).forEach((row, index) => root.append(createOfferCard(row, { locale: state.locale, primary: index === 0 })));
+  recommendedRows(items(state.data.featured)).slice(0, 3).forEach((row, index) => root.append(createOfferCard(row, { locale: state.locale, primary: index === 0, availabilityStatus: availabilityStatus(row) })));
 }
 
 function renderChanges() {
@@ -364,7 +426,7 @@ function renderResults() {
   root.replaceChildren();
   if (!visible.length) root.append(element("article", "empty-card", t("noData")));
   else if (state.group === "prices") visible.forEach((row) => root.append(renderPriceCard(row)));
-  else visible.forEach((row) => root.append(createOfferCard(row, { locale: state.locale })));
+  else visible.forEach((row) => root.append(createOfferCard(row, { locale: state.locale, availabilityStatus: availabilityStatus(row) })));
   $("load-status").textContent = `${t("loaded")} ${visible.length} / ${rows.length}`;
   const pager = $("pager");
   pager.hidden = rows.length <= PAGE_SIZE;
@@ -387,7 +449,6 @@ function render() {
 
 function setLocale(locale) {
   state.locale = locale === "en" ? "en" : "zh-CN";
-  localStorage.setItem("ai-radar-locale", state.locale);
   document.documentElement.lang = state.locale;
   document.title = state.locale === "en" ? "AI Resource Radar — verified free AI and prices" : "AI Resource Radar — AI 免费资源与价格雷达";
   document.querySelectorAll("[data-i18n]").forEach((node) => {
@@ -398,7 +459,17 @@ function setLocale(locale) {
     const value = COPY[state.locale][node.dataset.i18nPlaceholder];
     if (value) node.placeholder = value;
   });
+  $("language-toggle").textContent = state.locale === "en" ? "中文" : "English";
+  $("language-toggle").setAttribute("aria-label", state.locale === "en" ? "切换到中文" : "Switch to English");
   if (state.data.manifest) render();
+}
+
+function switchLocalePath() {
+  const url = new URL(location.href);
+  const rootPath = url.pathname.replace(/\/zh\/?$/, "/");
+  url.pathname = state.locale === "en" ? `${rootPath.replace(/\/$/, "")}/zh/` : rootPath;
+  url.searchParams.delete("lang");
+  location.assign(`${url.pathname}${url.search}${url.hash}`);
 }
 
 function resetPageAndRender() { state.page = 1; render(); }
@@ -510,21 +581,34 @@ function selectView(view) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  state.locale = localStorage.getItem("ai-radar-locale") || (/^en/i.test(navigator.language) ? "en" : "zh-CN");
-  $("language-toggle").addEventListener("click", () => setLocale(state.locale === "en" ? "zh-CN" : "en"));
+  // Route state is read before rendering.  Never infer a locale from IP,
+  // cookies, browser storage, or the browser's language preference.
+  readRoute();
+  $("language-toggle").addEventListener("click", switchLocalePath);
   document.querySelectorAll("[data-group]").forEach((button) => button.addEventListener("click", () => {
     selectView(defaultView(button.dataset.group));
   }));
   document.querySelectorAll("[data-view]").forEach((button) => button.addEventListener("click", () => {
     selectView(button.dataset.view);
   }));
-  ["search-input", "provider-filter", "verification-filter", "card-filter", "mainland-filter", "sort-filter"].forEach((id) => $(id).addEventListener("input", resetPageAndRender));
+  ["search-input", "provider-filter", "verification-filter", "card-filter", "include-unknown-region", "sort-filter"].forEach((id) => $(id).addEventListener("input", resetPageAndRender));
+  $("country-filter").addEventListener("input", () => {
+    $("country-filter").value = $("country-filter").value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2);
+    if ($("country-filter").value) $("region-filter").value = "";
+    resetPageAndRender();
+  });
+  $("region-filter").addEventListener("change", () => {
+    if ($("region-filter").value) $("country-filter").value = "";
+    resetPageAndRender();
+  });
   $("clear-filters").addEventListener("click", () => {
     $("search-input").value = "";
     $("provider-filter").value = "";
     $("verification-filter").value = "all";
     $("card-filter").value = "all";
-    $("mainland-filter").value = "all";
+    $("country-filter").value = "";
+    $("region-filter").value = "";
+    $("include-unknown-region").checked = false;
     $("sort-filter").value = defaultSort();
     resetPageAndRender();
   });

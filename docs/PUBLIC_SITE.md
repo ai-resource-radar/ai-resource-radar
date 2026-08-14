@@ -4,8 +4,10 @@ The public site is a static, read-only view of the latest **AI Resource Radar** 
 
 - Live site: <https://ai-resource-radar.github.io/ai-resource-radar/>
 - Machine-readable data: <https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json>
-- Atom feed: <https://ai-resource-radar.github.io/ai-resource-radar/feed.xml>
-- RSS feed: <https://ai-resource-radar.github.io/ai-resource-radar/rss.xml>
+- English entry: <https://ai-resource-radar.github.io/ai-resource-radar/>
+- Chinese entry: <https://ai-resource-radar.github.io/ai-resource-radar/zh/>
+- English Atom/RSS: `/en/feed.xml` and `/en/rss.xml`
+- Chinese-compatible Atom/RSS: `/feed.xml` and `/rss.xml`
 - Builder: `ai-radar site build --database PATH --output DIR --base-url URL`
 - Search Console option: `--search-console-provider none|google` (local default: `none`)
 - Provider pages: `/zh/providers/<slug>/` and `/en/providers/<slug>/`
@@ -27,9 +29,13 @@ and is never published.
 
 ```json
 {
-  "schema_version": "1.3",
+  "schema_version": "1.4",
   "dataset": "ai-resource-radar-public",
-  "package_version": "0.8.0",
+  "package_version": "0.9.0",
+  "default_language": "en",
+  "supported_languages": ["en", "zh-CN"],
+  "region_model_version": "2026-08-14.v1",
+  "region_presets": {"eu-eea": ["AT", "BE", "..."], "southeast-asia": ["BN", "KH", "..."]},
   "source_revision": "0123456789abcdef",
   "refresh_mode": "forced",
   "refresh_started_at": "2026-01-01T00:24:00Z",
@@ -44,7 +50,7 @@ and is never published.
   "status": "healthy",
   "generated_at": "2026-01-01T00:27:00Z",
   "radar_refreshed_at": "2026-01-01T00:25:00Z",
-  "counts": {"resources": 0, "token_prices": 0, "gpu_prices": 0, "changes": 0},
+  "counts": {"resources": 0, "official_verified_resources": 0, "community_candidates": 0, "token_prices": 0, "gpu_prices": 0, "changes": 0},
   "source_health": {},
   "files": [
     "data/resources.json", "data/token-prices.json", "data/gpu-prices.json",
@@ -74,7 +80,7 @@ from `manifest.files` rather than assuming a future badge name:
 
 | File | Contents |
 | --- | --- |
-| `data/resources.json` (+ `.csv`) | Current token, GPU, and grant offers: stable ID, provider/title, kind, quota/unit, reset or expiry, card/phone/region requirements, verification level, source URL, and observed time. |
+| `data/resources.json` (+ `.csv`) | Current token, GPU, and grant offers: stable ID, provider/title, kind, quota/unit, reset or expiry, six tri-state signup requirements, ISO country facts, bilingual presentations, verification level, source URL, and observed time. |
 | `data/token-prices.json` (+ `.csv`) | Token input/output/cached prices normalized per 1M tokens, with provider/model, currency, source URL, and observed time. |
 | `data/gpu-prices.json` (+ `.csv`) | GPU on-demand prices normalized per hour, with provider/model, currency, region, source URL, and observed time. |
 | `data/changes.json` (+ `.csv`) | Bounded recent additions, removals, quota/price/restriction changes, source ID, and event time. |
@@ -95,8 +101,9 @@ official evidence, but do not personalize content or promise that an offer remai
 
 ## Feeds and safe links
 
-The root Atom and RSS documents are `/feed.xml` and `/rss.xml`; English documents are
-`/en/feed.xml` and `/en/rss.xml`. They expose only public resources and bounded recent changes. Each
+The root Atom and RSS documents `/feed.xml` and `/rss.xml` remain Chinese-compatible stable URLs;
+the English homepage auto-discovers `/en/feed.xml` and `/en/rss.xml`. They expose only public
+resources and bounded recent changes. Each
 entry uses a stable hash identifier rather than a SQLite row ID and includes an observed time and a
 safe same-origin or official-source URL. Source text, request headers, cookies, account fields, and
 local paths are never copied into a feed. Consumers should treat every item as a time-sensitive
@@ -147,7 +154,9 @@ Console receives aggregate indexing/search reporting for the verified public pro
 verification token is read only from the build environment and appears only in Google's required
 public homepage marker; it is not logged or copied to feeds.
 
-The landing page fetches only the manifest, summary, source health, featured resources, and bounded
+The canonical `/` landing page is English and `/zh/` is Chinese. Language selection is never inferred
+from IP address or browser settings. Country and region choices live only in the shareable query URL;
+the site uses no cookie or local storage. The landing page fetches only the manifest, summary, source health, featured resources, and bounded
 important changes. Full resources and price datasets load when the corresponding view is opened and
 are cached for the current browser session. Existing full JSON/CSV URLs remain stable for machine
 consumers, and the four Atom/RSS feeds expose the same public-only projection with stable hash IDs.

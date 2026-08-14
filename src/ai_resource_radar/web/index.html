@@ -26,6 +26,7 @@
           </nav>
         </div>
         <div class="header-actions">
+          <a id="language-toggle" class="text-action" href="?lang=zh-CN" aria-label="Switch language">中文</a>
           <span id="last-verified" class="last-verified">等待首次核验</span>
           <span id="source-health" class="health-pill" role="status" aria-live="polite">
             <span class="health-dot" aria-hidden="true"></span>
@@ -44,13 +45,13 @@
         <div class="hero-trust" aria-label="资源筛选原则">
           <span>官方核验</span>
           <span>无需信用卡优先</span>
-          <span>大陆可用优先</span>
+          <span>国家可用性据实展示</span>
         </div>
       </div>
       <div class="hero-pick">
         <span id="hero-pick-label">今日精选</span>
         <strong id="hero-pick-title">正在筛选 3 项资源</strong>
-        <small id="hero-pick-note">按免费价值、门槛和大陆可用性排序</small>
+        <small id="hero-pick-note">按免费价值和注册门槛排序</small>
       </div>
     </section>
 
@@ -110,7 +111,6 @@
                 <div id="free-quick-filters" class="quick-filters" aria-label="快速筛选">
                   <label><input id="verified-only" type="checkbox" checked> 官方核验</label>
                   <label><input id="no-card" type="checkbox" checked> 无需信用卡</label>
-                  <label><input id="mainland-supported" type="checkbox" checked> 大陆可用</label>
                 </div>
                 <button id="toggle-filters" class="filter-toggle" type="button" aria-expanded="false">
                   更多筛选
@@ -235,8 +235,9 @@
 
             <div class="radar-filters" aria-label="更多资源过滤" hidden>
               <label><input id="free-image-generation" type="checkbox"> 免费生图</label>
-              <label><input id="mainland-unknown" type="checkbox" checked> 大陆情况未知</label>
-              <label><input id="mainland-unsupported" type="checkbox"> 官方不支持大陆</label>
+              <label><span>国家代码</span><input id="country-filter" type="text" inputmode="latin" maxlength="2" placeholder="DE"></label>
+              <label><span>区域预设</span><select id="region-filter"><option value="">不选择区域</option><option value="eu-eea">EU / EEA</option><option value="southeast-asia">Southeast Asia</option><option value="us">United States</option><option value="uk">United Kingdom</option><option value="india">India</option><option value="china">China</option></select></label>
+              <label><input id="include-unknown-region" type="checkbox"> 包含地区未知</label>
             </div>
 
             <div id="refresh-state" class="refresh-state" role="status" aria-live="polite" hidden></div>

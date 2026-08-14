@@ -2,7 +2,7 @@
 
 # AI 免费资源雷达
 
-**每天核验免费 AI Token、GPU 算力和价格变化，告诉你送什么、怎么领。**
+**每天核验全球免费 AI API、GPU 算力和价格，并按地区可用性、注册门槛和真实接入方式筛选。**
 
 [![CI](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/ci.yml/badge.svg)](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/ci.yml)
 [![Pages](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/pages.yml/badge.svg)](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/pages.yml)
@@ -14,7 +14,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/github/license/ai-resource-radar/ai-resource-radar)](LICENSE)
 
-[Live Radar](https://ai-resource-radar.github.io/ai-resource-radar/) · [Data](https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json) · [Atom 订阅](https://ai-resource-radar.github.io/ai-resource-radar/feed.xml) · [RSS 订阅](https://ai-resource-radar.github.io/ai-resource-radar/rss.xml) · [uvx 开始](#用-uvx-开始) · [English](README.md)
+[中文雷达](https://ai-resource-radar.github.io/ai-resource-radar/zh/) · [Data](https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json) · [Atom 订阅](https://ai-resource-radar.github.io/ai-resource-radar/feed.xml) · [RSS 订阅](https://ai-resource-radar.github.io/ai-resource-radar/rss.xml) · [uvx 开始](#用-uvx-开始) · [English site](https://ai-resource-radar.github.io/ai-resource-radar/) · [English README](README.md)
 
 [工作原理](#工作原理) · [公开站点说明](docs/PUBLIC_SITE.md) · [安全说明](docs/SECURITY.md)
 
@@ -24,7 +24,7 @@
 
 *公开雷达无需登录或 API Key，提供最新的只读资源快照。*
 
-AI 免费资源雷达是一个本地优先的免费 Token、GPU 算力、资助和价格追踪器。不只给出链接，还会直接说明
+AI 免费资源雷达是一个全球优先、同时保持本地隐私的免费 Token、GPU 算力、资助和价格追踪器。不只给出链接，还会直接说明
 **送什么、送多少、多久恢复、有哪些门槛，以及怎样开始使用**；每项结果都保留来源与核验时间。
 
 默认采集链路完全由确定性脚本执行，**不调用 AI，不需要 API Key、Cookie 或账号信息**。
@@ -41,8 +41,8 @@ uvx ai-resource-radar start --open
 也可以直接打开 [Live Radar](https://ai-resource-radar.github.io/ai-resource-radar/)，或下载有版本说明的
 [公开数据清单](https://ai-resource-radar.github.io/ai-resource-radar/data/manifest.json)。公开站点只是聚合视图，
 实际使用前仍应打开官方来源核对政策。
-v0.8.0 的公共站新增 6 个双语场景页、稳定的 Atom/RSS 订阅、可索引的中英文服务商页面、
-经过兼容门禁的接入示例和按需数据加载，同时继续保持纯静态只读；Pages 每次发布都会绑定本轮
+v0.9.0 将英文设为全球默认入口，引入国家级可用性和明确的注册门槛，并为所有内置官方
+A/B 级资源提供确定性的中英文展示文案。公共站仍然是静态只读站点；Pages 每次发布都会绑定本轮
 23 个来源的刷新结果和对应 Git 提交。
 
 ## 公共场景页、订阅与搜索可见性
@@ -72,7 +72,7 @@ GitHub Watch，不要把它当成每日资源订阅的替代品。
 
 | 能力 | 你能看到什么 |
 | --- | --- |
-| 免费 Token 雷达 | 额度、重置周期、信用卡/手机号要求、大陆状态、官方证据和领取步骤 |
+| 免费 Token 雷达 | 额度、重置周期、国家可用性、注册门槛、官方证据和领取步骤 |
 | 免费 GPU 与资助 | GPU 时间或 credits、资格、有效期、限制和官方入口 |
 | Token 价格榜 | 统一折算每 100 万 Token 的输入、输出和缓存价格，并支持排序筛选 |
 | GPU 价格榜 | 统一折算按需 GPU 小时价，方便横向比较 |
@@ -149,12 +149,13 @@ Vision OCR 与菜单栏 Helper。
 
 | 等级 | 含义 |
 | --- | --- |
-| A | 官方核验、无需信用卡、周期性免费、大陆未明确不可用 |
+| A | 官方核验、无需信用卡、周期性免费且公布固定额度 |
 | B | 官方核验且无需信用卡，但额度浮动或存在资格条件 |
-| C | 需要申请、信用卡、特定地区或属于一次性试用 |
+| C | 需要申请、信用卡、身份验证、充值、等待名单或属于一次性试用 |
 | D | 仅社区发现，尚待官方核验 |
 
-同等级按照大陆支持情况、估算价值和最近变化排序。Dashboard 会展示具体理由，而不是只给一个
+地区不再改变 A–D 等级。未选择国家时按估算价值和最近变化排序；选择国家后优先展示已确认
+可用资源，只有用户主动开启时才包含地区未知项。Dashboard 会展示具体理由，而不是只给一个
 无法解释的数字。
 
 ## 可选扩展
@@ -214,7 +215,7 @@ ai-radar tips rollback-batch <batch-id>
 
 ## 数据、隐私与存储
 
-- SQLite schema v7，数据库权限为 `0600`，不保存密钥、Cookie 或账号信息。
+- SQLite schema v8，数据库权限为 `0600`，不保存密钥、Cookie 或账号信息。
 - 公共场景页和 Atom/RSS 订阅只包含有界的聚合来源事实与稳定哈希 ID，不包含本地数据库 ID、请求
   头、Cookie 或账号信息。
 - Google Search Console 验证只在生产构建中启用。Token 从环境变量读取，只出现在 Google 要求的

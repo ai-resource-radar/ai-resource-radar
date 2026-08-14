@@ -12,6 +12,7 @@ import {
   resetLabel,
   usageSteps,
 } from "/ai-radar-assets/modules/formatters.js";
+import { dashboardLocale, tr } from "/ai-radar-assets/modules/i18n.js";
 
 export { element, safeLink };
 
@@ -43,14 +44,16 @@ export function installDialog(dialog, closeButton, detailRoot) {
 }
 
 export function cardBadges(resource) {
-  const badges = [[resource.requires_card === "no" ? "无需信用卡" : "信用卡待确认", ""]];
-  if (resource.free_image_generation) badges.push(["免费生图", "good"]);
+  const badges = [[resource.requires_card === "no" ? tr("No card", "无需信用卡") : tr("Card requirement unknown", "信用卡待确认"), ""]];
+  if (resource.free_image_generation) badges.push([tr("Free image generation", "免费生图"), "good"]);
   if (resource.reset_period && !["unknown", "variable"].includes(resource.reset_period)) {
-    badges.push([`${resetLabel(resource.reset_period)}重置`, ""]);
+    badges.push([tr(`${resetLabel(resource.reset_period)} reset`, `${resetLabel(resource.reset_period)}重置`), ""]);
   }
-  badges.push(resource.mainland_status === "supported"
-    ? ["大陆可用", "good"]
-    : resource.mainland_status === "unsupported" ? ["大陆不支持", ""] : ["大陆待确认", ""]);
+  badges.push(resource.availability_status === "supported" || resource.availability_scope === "global"
+    ? [tr("Region confirmed", "地区已确认"), "good"]
+    : resource.availability_status === "unsupported"
+      ? [tr("Region unavailable", "地区不支持"), ""]
+      : [tr("Region unknown", "地区待确认"), ""]);
   return badges;
 }
 
@@ -68,9 +71,10 @@ export function activateCard(card, action) {
 
 export function featureCard(resource, primary, ctx) {
   return createOfferCard(resource, {
-    locale: "zh-CN",
+    locale: ctx.state.locale || dashboardLocale(),
     primary,
     className: "feature-card",
+    availabilityStatus: resource.availability_status,
     onDetails: (offer, trigger) => ctx.showOffer(offer, trigger),
   });
 }
@@ -78,13 +82,13 @@ export function featureCard(resource, primary, ctx) {
 function appendPolicyGuide(resource, detailRoot, options = {}) {
   const resourceGuide = guide(resource);
   const policy = element("section", "policy-hero");
-  policy.append(element("span", "policy-kicker", "你能白嫖到"), element("strong", "policy-amount", actionQuota(resource)), element("p", "policy-summary", benefitSummary(resource)));
+  policy.append(element("span", "policy-kicker", tr("What you get", "你能白嫖到")), element("strong", "policy-amount", actionQuota(resource)), element("p", "policy-summary", benefitSummary(resource)));
   const badges = element("div", "offer-badges");
   cardBadges(resource).forEach(([text, className]) => badges.append(element("span", className, text)));
   policy.append(badges);
   detailRoot.append(policy);
   const grid = element("div", "detail-grid compact");
-  [["恢复周期", resetLabel(resource.reset_period)], ["信用卡", resource.requires_card === "no" ? "不需要" : resource.requires_card === "yes" ? "需要" : "待确认"], ["大陆情况", resource.mainland_status === "supported" ? "可用" : resource.mainland_status === "unsupported" ? "官方不支持" : "待确认"], ["最近核验", formatTime(resource.last_seen_at)]].forEach(([label, value]) => {
+  [[tr("Reset period", "恢复周期"), resetLabel(resource.reset_period)], [tr("Credit card", "信用卡"), resource.requires_card === "no" ? tr("Not required", "不需要") : resource.requires_card === "yes" ? tr("Required", "需要") : tr("Unknown", "待确认")], [tr("Availability", "地区可用性"), resource.availability_status === "supported" || resource.availability_scope === "global" ? tr("Confirmed", "已确认") : resource.availability_status === "unsupported" ? tr("Unavailable", "不支持") : tr("Unknown", "待确认")], [tr("Last verified", "最近核验"), formatTime(resource.last_seen_at)]].forEach(([label, value]) => {
     const item = element("div");
     item.append(element("span", "", label), element("strong", "", value));
     grid.append(item);
@@ -92,8 +96,8 @@ function appendPolicyGuide(resource, detailRoot, options = {}) {
   detailRoot.append(grid);
   if (!options.hideActions) {
     const actions = element("div", "policy-actions");
-    const primary = safeLink(resourceGuide.action_label || "去使用", resourceGuide.action_url || resource.homepage_url, "policy-primary-action");
-    const source = safeLink("查看官方政策 ↗", resource.homepage_url, "policy-secondary-action");
+    const primary = safeLink(resourceGuide.action_label || tr("Open resource", "去使用"), resourceGuide.action_url || resource.homepage_url, "policy-primary-action");
+    const source = safeLink(tr("Official policy ↗", "查看官方政策 ↗"), resource.homepage_url, "policy-secondary-action");
     if (primary) actions.append(primary);
     if (source && (!primary || source.href !== primary.href)) actions.append(source);
     if (actions.childElementCount) detailRoot.append(actions);
@@ -209,7 +213,7 @@ export function createDialogActions({ dialog, detailRoot, dialogController, ctx 
 
 export function updateHero(ctx) {
   const { currentView } = ctx.state;
-  ctx.dom.queryInput.placeholder = currentView === "tips" ? "搜索技巧" : "搜索资源";
+  ctx.dom.queryInput.placeholder = currentView === "tips" ? tr("Search tips", "搜索技巧") : tr("Search resources", "搜索资源");
   if (currentView === "tips") {
     ctx.dom.heroEyebrow.textContent = "AI PRODUCTIVITY PLAYBOOK";
     ctx.dom.heroTitle.replaceChildren("把好方法，", element("br"), "变成可复用规则");
@@ -241,15 +245,15 @@ export function updateHero(ctx) {
 
 export function renderRankingExplainer(ctx, trigger) {
   ctx.dom.detailRoot.replaceChildren(
-    element("h2", "", "推荐规则"),
-    element("p", "", "页面不使用隐藏总分。A 级优先表示官方核验、无需信用卡、周期免费，并且中国大陆未被官方明确排除。"),
+    element("h2", "", tr("Recommendation rules", "推荐规则")),
+    element("p", "", tr("There is no opaque score. Region availability is shown only when you select a country or preset, and never changes the A–D tier.", "页面不使用隐藏总分。地区可用性只有在选择国家或区域后才参与筛选，且不会改变 A–D 等级。")),
   );
   const box = element("div", "evidence-box");
   [
-    "A：官方核验、无需信用卡、周期免费",
-    "B：官方核验且无需信用卡，但额度浮动或有资格条件",
-    "C：需要申请、信用卡、特定地区或一次性试用",
-    "D：社区发现，尚未官方核验",
+    tr("A: official, recurring free tier, no card, explicit quota", "A：官方核验、无需信用卡、周期免费且额度明确"),
+    tr("B: official and no card, but quota or conditions are incomplete", "B：官方核验且无需信用卡，但额度浮动或条件不完整"),
+    tr("C: card, one-time trial, application, identity check, top-up, or waitlist", "C：信用卡、一次性试用、申请、身份验证、充值或等待名单"),
+    tr("D: community discovery, not yet officially verified", "D：社区发现，尚未官方核验"),
   ].forEach((rule) => box.append(element("p", "", rule)));
   ctx.dom.detailRoot.append(box);
   ctx.openDialog(trigger);

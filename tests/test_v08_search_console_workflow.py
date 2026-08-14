@@ -13,6 +13,7 @@ class V080SearchConsoleWorkflowTests(unittest.TestCase):
         cls.readme = (ROOT / "README.md").read_text(encoding="utf-8")
         cls.readme_zh = (ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
         cls.public_site = (ROOT / "docs/PUBLIC_SITE.md").read_text(encoding="utf-8")
+        cls.public_site_module = (ROOT / "src/ai_resource_radar/public_site.py").read_text(encoding="utf-8")
         cls.privacy = (ROOT / "docs/PRIVACY.md").read_text(encoding="utf-8")
         cls.changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 
@@ -52,12 +53,12 @@ class V080SearchConsoleWorkflowTests(unittest.TestCase):
         self.assertIn("feeds", self.public_site)
         self.assertIn("0.8.0", self.changelog)
 
-    def test_package_version_is_v080(self) -> None:
+    def test_package_version_is_v090(self) -> None:
         pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
         facade = (ROOT / "src/ai_resource_radar/__init__.py").read_text(encoding="utf-8")
-        self.assertIn('version = "0.8.0"', pyproject)
-        self.assertIn('__version__ = "0.8.0"', facade)
-        self.assertIn('"schema_version": "1.3"', self.public_site)
+        self.assertIn('version = "0.9.0"', pyproject)
+        self.assertIn('__version__ = "0.9.0"', facade)
+        self.assertIn('PUBLIC_SCHEMA_VERSION = "1.4"', self.public_site_module)
 
 
 if __name__ == "__main__":

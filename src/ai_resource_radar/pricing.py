@@ -166,6 +166,12 @@ def list_token_prices(
         if selected_provider and str(row["provider"]).casefold() != selected_provider:
             continue
         details = json.loads(row["details_json"])
+        source_currency = str(details.get("currency") or "USD").strip().upper()
+        # Token price fields do not carry an exchange-rate provenance.  A
+        # non-USD row therefore remains in the raw offer evidence but cannot
+        # enter the cross-provider USD ranking in v0.9.
+        if source_currency != "USD":
+            continue
         prices = _active_price_map(details.get("prices"), current=today)
         input_price = _base_price(prices.get("input_mtok"))
         output_price = _base_price(prices.get("output_mtok"))
@@ -211,6 +217,7 @@ def list_token_prices(
                 "typical_cost": typical,
                 "context_window": context_window,
                 "currency": "USD",
+                "source_currency": source_currency,
                 "pricing_url": row["homepage_url"],
                 "verification_level": row["verification_level"],
                 "verification_label": (
@@ -313,6 +320,11 @@ def list_gpu_prices(
         if selected_gpu and model.casefold() != selected_gpu:
             continue
         hourly = _finite_number(details.get("hourly_usd"))
+        # ``hourly_usd`` is the normalized ranking value.  Rows that only
+        # provide an original-currency amount stay available in raw evidence
+        # but are excluded until a traceable conversion source exists.
+        if hourly is None:
+            continue
         vram = _finite_number(details.get("vram_gb")) or gpu_vram(model)
         normalized_billing = str(details.get("billing_mode") or "unknown")
         normalized_tier = str(details.get("market_tier") or "on-demand")
@@ -343,7 +355,9 @@ def list_gpu_prices(
                 "market_tier": normalized_tier,
                 "price_mode": normalized_price_mode,
                 "price_note": details.get("price_note") or row["eligibility"],
-                "currency": details.get("currency") or "USD",
+                "currency": "USD",
+                "source_currency": str(details.get("currency") or "USD").upper(),
+                "source_price": details.get("hourly_price"),
                 "pricing_url": row["homepage_url"],
                 "verification_level": row["verification_level"],
                 "verification_label": "官方价格",

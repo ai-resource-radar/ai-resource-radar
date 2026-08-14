@@ -7,6 +7,7 @@
  */
 import { beginViewRequest, fetchJson, fetchViewJson, isAbortError } from "/ai-radar-assets/modules/api.js";
 import { KNOWN_VIEWS, readRoute, writeRoute } from "/ai-radar-assets/modules/state-router.js";
+import { setDashboardLocale } from "/ai-radar-assets/modules/i18n.js";
 import {
   actionQuota,
   benefitSummary,
@@ -49,9 +50,9 @@ export function mountDashboard({ viewModules = {} } = {}) {
     verifiedOnly: document.querySelector("#verified-only"),
     noCard: document.querySelector("#no-card"),
     freeImageGeneration: document.querySelector("#free-image-generation"),
-    mainlandSupported: document.querySelector("#mainland-supported"),
-    mainlandUnknown: document.querySelector("#mainland-unknown"),
-    mainlandUnsupported: document.querySelector("#mainland-unsupported"),
+    country: document.querySelector("#country-filter"),
+    region: document.querySelector("#region-filter"),
+    includeUnknownRegion: document.querySelector("#include-unknown-region"),
     filters: document.querySelector(".radar-filters"),
     filterToggle: document.querySelector("#toggle-filters"),
     tabs: [...document.querySelectorAll("[data-view]")],
@@ -105,11 +106,16 @@ export function mountDashboard({ viewModules = {} } = {}) {
     browserGrid: document.querySelector(".browser-grid"),
     radarSidebar: document.querySelector(".radar-sidebar"),
     sourceHealthDisclosure: document.querySelector("#source-health-disclosure"),
+    languageToggle: document.querySelector("#language-toggle"),
   };
 
   const route = readRoute();
   const state = {
     currentView: route.view,
+    // A `lang` URL parameter wins.  Without one the summary endpoint can
+    // supply the host's default_locale (standalone=en, host may be zh-CN).
+    locale: route.locale === "zh-CN" || route.locale === "en" ? route.locale : "",
+    localeFromRoute: Boolean(route.locale),
     comparedPrices: new Map(),
     providerProfiles: new Map(),
     tipFilters: {
@@ -123,6 +129,7 @@ export function mountDashboard({ viewModules = {} } = {}) {
     searchTimer: null,
     refreshTimer: null,
   };
+  if (state.locale) setDashboardLocale(state.locale);
   dom.queryInput.value = route.query;
 
   function routeBoolean(filters, key, fallback) {
@@ -140,10 +147,9 @@ export function mountDashboard({ viewModules = {} } = {}) {
     dom.verifiedOnly.checked = routeBoolean(filters, "verified", true);
     dom.noCard.checked = routeBoolean(filters, "no_card", true);
     dom.freeImageGeneration.checked = routeBoolean(filters, "image", false);
-    const mainland = new Set((filters.mainland || "supported,unknown").split(",").filter(Boolean));
-    dom.mainlandSupported.checked = mainland.has("supported");
-    dom.mainlandUnknown.checked = mainland.has("unknown");
-    dom.mainlandUnsupported.checked = mainland.has("unsupported");
+    dom.country.value = filters.country || "";
+    dom.region.value = filters.region || "";
+    dom.includeUnknownRegion.checked = routeBoolean(filters, "include_unknown_region", false);
   }
 
   function applyPricingRouteFilters(filters) {
@@ -174,12 +180,9 @@ export function mountDashboard({ viewModules = {} } = {}) {
     if (!dom.verifiedOnly.checked) filters.verified = "0";
     if (!dom.noCard.checked) filters.no_card = "0";
     if (dom.freeImageGeneration.checked) filters.image = "1";
-    const mainland = [
-      dom.mainlandSupported.checked && "supported",
-      dom.mainlandUnknown.checked && "unknown",
-      dom.mainlandUnsupported.checked && "unsupported",
-    ].filter(Boolean).join(",");
-    if (mainland !== "supported,unknown") filters.mainland = mainland;
+    if (dom.country.value.trim()) filters.country = dom.country.value.trim();
+    if (dom.region.value.trim()) filters.region = dom.region.value.trim();
+    if (dom.includeUnknownRegion.checked) filters.include_unknown_region = "1";
     if (["token-prices", "gpu-prices"].includes(state.currentView)) {
       const defaults = state.currentView === "token-prices" ? { sort: "typical" } : { sort: "hourly" };
       if (dom.pricingSort.value && dom.pricingSort.value !== defaults.sort) filters.sort = dom.pricingSort.value;
@@ -212,7 +215,7 @@ export function mountDashboard({ viewModules = {} } = {}) {
   }
 
   function syncRoute() {
-    writeRoute(state.currentView, dom.queryInput.value, collectRouteFilters());
+    writeRoute(state.currentView, dom.queryInput.value, collectRouteFilters(), state.locale);
   }
 
   applyBaseRouteFilters(route.filters);
@@ -243,6 +246,15 @@ export function mountDashboard({ viewModules = {} } = {}) {
     changeLabel,
     syncRoute,
     loadCurrentView: () => loadCurrentView(),
+    setLocale: (locale) => {
+      if (!state.localeFromRoute && (locale === "en" || locale === "zh-CN")) state.locale = locale;
+      setDashboardLocale(state.locale || "en");
+      dom.languageToggle.textContent = state.locale === "zh-CN" ? "English" : "中文";
+      const target = state.locale === "zh-CN" ? "en" : "zh-CN";
+      const url = new URL(window.location.href);
+      url.searchParams.set("lang", target);
+      dom.languageToggle.href = `${url.pathname}${url.search}${url.hash}`;
+    },
   };
   const dialogController = installDialog(dom.dialog, dom.closeDialogButton, dom.detailRoot);
   const dialogActions = createDialogActions({ dialog: dom.dialog, detailRoot: dom.detailRoot, dialogController, ctx });
@@ -398,8 +410,17 @@ export function mountDashboard({ viewModules = {} } = {}) {
 
   dom.tabs.forEach((tab) => tab.addEventListener("click", () => selectView(tab.dataset.view)));
   document.querySelectorAll("[data-open-view]").forEach((link) => link.addEventListener("click", () => selectView(link.dataset.openView)));
-  [dom.verifiedOnly, dom.noCard, dom.freeImageGeneration, dom.mainlandSupported, dom.mainlandUnknown, dom.mainlandUnsupported]
+  [dom.verifiedOnly, dom.noCard, dom.freeImageGeneration, dom.includeUnknownRegion]
     .forEach((control) => control.addEventListener("change", loadCurrentView));
+  dom.country.addEventListener("input", () => {
+    dom.country.value = dom.country.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2);
+    if (dom.country.value) dom.region.value = "";
+  });
+  dom.country.addEventListener("change", loadCurrentView);
+  dom.region.addEventListener("change", () => {
+    if (dom.region.value) dom.country.value = "";
+    loadCurrentView();
+  });
   dom.queryInput.addEventListener("input", () => {
     syncRoute();
     window.clearTimeout(state.searchTimer);
@@ -449,9 +470,9 @@ export function mountDashboard({ viewModules = {} } = {}) {
     dom.verifiedOnly.checked = false;
     dom.noCard.checked = false;
     dom.freeImageGeneration.checked = false;
-    dom.mainlandSupported.checked = true;
-    dom.mainlandUnknown.checked = true;
-    dom.mainlandUnsupported.checked = true;
+    dom.country.value = "";
+    dom.region.value = "";
+    dom.includeUnknownRegion.checked = true;
     dom.filterToggle.setAttribute("aria-expanded", "true");
     dom.filters.hidden = false;
     selectView("recommended");
@@ -472,6 +493,8 @@ export function mountDashboard({ viewModules = {} } = {}) {
   function restoreRoute() {
     const next = readRoute();
     state.currentView = next.view;
+    state.locale = next.locale === "zh-CN" || next.locale === "en" ? next.locale : state.locale;
+    state.localeFromRoute = Boolean(next.locale);
     dom.queryInput.value = next.query;
     state.tipFilters = {
       status: next.filters.tip_status || "",
@@ -488,5 +511,8 @@ export function mountDashboard({ viewModules = {} } = {}) {
   window.addEventListener("hashchange", restoreRoute);
   window.addEventListener("popstate", restoreRoute);
 
-  Promise.all([loadProviderProfiles(), registryRecommended(), Promise.resolve(loadCurrentView())]);
+  // Resolve the host/standalone default locale before the catalogue renders.
+  // Running these concurrently lets an unqualified request render once with
+  // the module's legacy zh-CN default before the summary reports `en`.
+  Promise.all([loadProviderProfiles(), registryRecommended()]).finally(loadCurrentView);
 }

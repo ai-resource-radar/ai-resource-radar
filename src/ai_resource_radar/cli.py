@@ -78,7 +78,16 @@ def _parser(context: CliContext | None = None) -> argparse.ArgumentParser:
     list_parser.add_argument("--verified-only", action="store_true")
     list_parser.add_argument("--no-card", action="store_true")
     list_parser.add_argument("--free-image-generation", action="store_true")
-    list_parser.add_argument("--mainland", choices=("supported", "unknown", "unsupported"))
+    region_filter = list_parser.add_mutually_exclusive_group()
+    region_filter.add_argument("--country", help="ISO 3166-1 alpha-2 code, e.g. CN")
+    region_filter.add_argument("--region", help="Named preset, e.g. eu-eea or southeast-asia")
+    region_filter.add_argument(
+        "--mainland",
+        choices=("supported", "unknown", "unsupported"),
+        help="Deprecated compatibility filter; use --country CN instead.",
+    )
+    list_parser.add_argument("--include-unknown-region", action="store_true")
+    list_parser.add_argument("--locale", default=context.default_locale)
     list_parser.add_argument("--query")
     list_parser.add_argument("--limit", type=int, default=100)
     list_parser.add_argument("--offset", type=int, default=0)
@@ -279,17 +288,36 @@ def _print(payload: object, *, output: Path | None = None) -> None:
         output.write_text(rendered, encoding="utf-8")
 
 
-def _list_markdown(records: tuple[dict[str, Any], ...]) -> str:
+def _list_markdown(records: tuple[dict[str, Any], ...], *, locale: str = "en") -> str:
+    chinese = locale.casefold().startswith("zh")
     if not records:
-        return "# AI 资源雷达\n\n还没有本地数据，请先运行 `ai-radar refresh`。\n"
-    lines = ["# AI 资源雷达", ""]
+        return (
+            "# AI 资源雷达\n\n还没有本地数据，请先运行 `ai-radar refresh`。\n"
+            if chinese
+            else "# AI Resource Radar\n\nNo local data yet. Run `ai-radar refresh` first.\n"
+        )
+    lines = ["# AI 资源雷达" if chinese else "# AI Resource Radar", ""]
     for record in records:
         quota = record.get("quota_value")
-        quota_text = "额度浮动" if quota is None else f"{quota:g} {record.get('quota_unit') or ''}".strip()
-        card = "无需信用卡" if record.get("requires_card") == "no" else "信用卡要求待确认"
+        quota_text = (
+            "额度浮动" if chinese else "Variable quota"
+        ) if quota is None else f"{quota:g} {record.get('quota_unit') or ''}".strip()
+        card_value = record.get("requires_card")
+        card = (
+            "无需信用卡" if card_value == "no" else "需要信用卡" if card_value == "yes" else "信用卡要求待确认"
+        ) if chinese else (
+            "No credit card required" if card_value == "no" else "Credit card required" if card_value == "yes" else "Card requirement unknown"
+        )
+        presentation = record.get("presentation")
+        title = (
+            presentation.get("title")
+            if isinstance(presentation, dict) and isinstance(presentation.get("title"), str)
+            else record.get("title", "")
+        )
+        separator = "；" if chinese else "; "
         lines.append(
             f"- [{record.get('priority_tier', 'D')}] {record.get('provider', '')} / "
-            f"{record.get('title', '')} — {quota_text}；{card}"
+            f"{title} — {quota_text}{separator}{card}"
         )
     return "\n".join(lines) + "\n"
 
@@ -337,6 +365,11 @@ def main(argv: list[str] | None = None, *, context: CliContext | None = None) ->
         return 1 if report.failed_count else 0
     if args.action == "list":
         try:
+            if args.mainland:
+                print(
+                    "warning: --mainland is deprecated; use --country CN",
+                    file=sys.stderr,
+                )
             records = list_offers(
                 args.database,
                 kind=args.kind,
@@ -344,6 +377,10 @@ def main(argv: list[str] | None = None, *, context: CliContext | None = None) ->
                 no_card=args.no_card,
                 free_image_generation=args.free_image_generation,
                 mainland=(args.mainland,) if args.mainland else None,
+                country=args.country,
+                region=args.region,
+                include_unknown_region=args.include_unknown_region,
+                locale=args.locale,
                 query=args.query,
                 limit=args.limit,
                 offset=args.offset,
@@ -355,7 +392,7 @@ def main(argv: list[str] | None = None, *, context: CliContext | None = None) ->
             print(str(exc), file=sys.stderr)
             return 2
         if args.format == "markdown":
-            _write_text(_list_markdown(records), args.output)
+            _write_text(_list_markdown(records, locale=args.locale), args.output)
         else:
             _print(
                 {"schema_version": "2.0", "count": len(records), "resources": records},

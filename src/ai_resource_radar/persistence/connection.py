@@ -1,4 +1,4 @@
-"""SQLite connection lifecycle for the schema-v7 radar database."""
+"""SQLite connection lifecycle for the schema-v8 radar database."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import sqlite3
 from typing import Any, Callable
 
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 
 class UnsupportedSchemaError(sqlite3.DatabaseError):

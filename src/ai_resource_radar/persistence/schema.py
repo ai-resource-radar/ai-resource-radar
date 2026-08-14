@@ -1,4 +1,4 @@
-"""Schema-v7 creation and transactional migration orchestration."""
+"""Schema-v8 creation and transactional migration orchestration."""
 
 from __future__ import annotations
 
@@ -8,7 +8,12 @@ from typing import Any
 
 from ai_resource_radar.sources import SOURCES
 from .connection import SCHEMA_VERSION, UnsupportedSchemaError
-from .migrations import _backfill_modality_fields, _columns, _metadata_set
+from .migrations import (
+    _backfill_modality_fields,
+    _backfill_v8_fields,
+    _columns,
+    _metadata_set,
+)
 
 def _create_v7_schema(connection: sqlite3.Connection) -> None:
     """Create schema-v7 objects inside the caller's migration transaction."""
@@ -29,6 +34,61 @@ def _create_v7_schema(connection: sqlite3.Connection) -> None:
         )
         """
     )
+def _create_v8_schema(connection: sqlite3.Connection) -> None:
+    """Create v0.9 availability and presentation objects transactionally."""
+
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS offer_availability (
+            offer_id TEXT NOT NULL REFERENCES offers(offer_id) ON DELETE CASCADE,
+            country_code TEXT NOT NULL,
+            availability_status TEXT NOT NULL
+                CHECK(availability_status IN ('supported', 'unsupported')),
+            source_url TEXT,
+            evidence_excerpt TEXT,
+            observed_at TEXT,
+            PRIMARY KEY(offer_id, country_code)
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS offer_availability_country
+            ON offer_availability(country_code, availability_status, offer_id)
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS offer_presentations (
+            offer_id TEXT NOT NULL REFERENCES offers(offer_id) ON DELETE CASCADE,
+            presentation TEXT NOT NULL DEFAULT 'default',
+            locale TEXT NOT NULL DEFAULT 'en',
+            title TEXT,
+            benefit_summary TEXT,
+            eligibility TEXT,
+            usage_steps_json TEXT NOT NULL DEFAULT '[]',
+            limitations_json TEXT NOT NULL DEFAULT '[]',
+            PRIMARY KEY(offer_id, presentation, locale)
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS offer_presentations_locale
+            ON offer_presentations(locale, offer_id)
+        """
+    )
+    presentation_columns = _columns(connection, "offer_presentations")
+    for name, declaration in (
+        ("benefit_summary", "TEXT"),
+        ("eligibility", "TEXT"),
+        ("usage_steps_json", "TEXT NOT NULL DEFAULT '[]'"),
+        ("limitations_json", "TEXT NOT NULL DEFAULT '[]'"),
+    ):
+        if name not in presentation_columns:
+            connection.execute(
+                f"ALTER TABLE offer_presentations ADD COLUMN {name} {declaration}"
+            )
     connection.execute(
         """
         CREATE INDEX IF NOT EXISTS tip_application_batches_time
@@ -158,8 +218,18 @@ def initialize(
             estimated_usd_value REAL,
             requires_card TEXT NOT NULL,
             requires_phone TEXT NOT NULL,
+            requires_identity_verification TEXT NOT NULL DEFAULT 'unknown'
+                CHECK(requires_identity_verification IN ('required', 'not_required', 'unknown')),
+            requires_paid_topup TEXT NOT NULL DEFAULT 'unknown'
+                CHECK(requires_paid_topup IN ('required', 'not_required', 'unknown')),
+            requires_waitlist TEXT NOT NULL DEFAULT 'unknown'
+                CHECK(requires_waitlist IN ('required', 'not_required', 'unknown')),
+            requires_organization TEXT NOT NULL DEFAULT 'unknown'
+                CHECK(requires_organization IN ('required', 'not_required', 'unknown')),
             eligibility TEXT,
             mainland_status TEXT NOT NULL,
+            availability_scope TEXT NOT NULL DEFAULT 'unknown'
+                CHECK(availability_scope IN ('global', 'restricted', 'unknown')),
             expires_at TEXT,
             homepage_url TEXT NOT NULL,
             verification_level TEXT NOT NULL,
@@ -340,16 +410,27 @@ def initialize(
     history_migration = 0 < previous_version < 3
     schema_migration = 0 < previous_version < SCHEMA_VERSION
     needs_v7_schema = previous_version < 7
+    v8_columns = {
+        "requires_identity_verification",
+        "requires_paid_topup",
+        "requires_waitlist",
+        "requires_organization",
+        "availability_scope",
+    }
+    needs_v8_backfill = not v8_columns <= offer_columns or previous_version < 8
     if (
         schema_migration
         or history_migration
         or needs_modality_backfill
         or needs_v7_schema
+        or needs_v8_backfill
     ) and not connection.in_transaction:
         connection.execute("BEGIN IMMEDIATE")
     with connection:
         if needs_v7_schema:
             create_v7_schema(connection)
+        if previous_version < 8:
+            _create_v8_schema(connection)
         # ALTER, backfill, metadata and user_version form the transactional
         # schema migration. SQLite rolls the whole block back on failure.
         for name, declaration in (
@@ -365,8 +446,22 @@ def initialize(
                 connection.execute(
                     f"ALTER TABLE offers ADD COLUMN {name} {declaration}"
                 )
+        for name, declaration in (
+            ("requires_identity_verification", "TEXT NOT NULL DEFAULT 'unknown'"),
+            ("requires_paid_topup", "TEXT NOT NULL DEFAULT 'unknown'"),
+            ("requires_waitlist", "TEXT NOT NULL DEFAULT 'unknown'"),
+            ("requires_organization", "TEXT NOT NULL DEFAULT 'unknown'"),
+            ("availability_scope", "TEXT NOT NULL DEFAULT 'unknown'"),
+        ):
+            if name not in offer_columns:
+                connection.execute(f"ALTER TABLE offers ADD COLUMN {name} {declaration}")
         if schema_migration or needs_modality_backfill:
             backfill_modality_fields(connection)
+        if needs_v8_backfill:
+            # This migration is strictly data-shaping: it never writes change
+            # history or notifications.  It safely represents the v7 mainland
+            # fact as CN and leaves all other countries unknown.
+            _backfill_v8_fields(connection)
         if history_migration:
             if changes_object is not None and changes_object["type"] == "table":
                 connection.execute("DROP TABLE changes")
@@ -430,4 +525,4 @@ def initialize(
 
 _initialize = initialize
 
-__all__ = ["initialize", "_initialize", "_create_v7_schema"]
+__all__ = ["initialize", "_initialize", "_create_v7_schema", "_create_v8_schema"]

@@ -166,11 +166,21 @@ def _quota(row: Mapping[str, Any], locale: str) -> str:
 
 
 def _presentation(row: Mapping[str, Any], locale: str) -> Mapping[str, Any]:
-    catalog = row.get("presentation")
+    catalog = row.get("presentations") or row.get("presentation")
     if not isinstance(catalog, Mapping):
         return {}
     value = catalog.get(locale)
-    return value if isinstance(value, Mapping) else {}
+    if isinstance(value, Mapping):
+        return value
+    # Do not fall through to a Chinese database policy body on English pages.
+    # This deliberately boring copy is safe for legacy/public rows that have
+    # not yet been enriched with bilingual presentation content.
+    if locale == "en":
+        return {
+            "benefit_summary": "See the official page for the current public policy.",
+            "usage_steps": ["Open the official page and follow the account instructions."],
+        }
+    return {}
 
 
 def _offer_cards(rows: Iterable[Mapping[str, Any]], locale: str) -> str:
@@ -285,7 +295,7 @@ def render_provider_page(
     <link rel="canonical" href="{escape(canonical, quote=True)}">
     <link rel="alternate" hreflang="zh-CN" href="{escape(provider_page_url(base_url, 'zh-CN', profile.slug), quote=True)}">
     <link rel="alternate" hreflang="en" href="{escape(provider_page_url(base_url, 'en', profile.slug), quote=True)}">
-    <link rel="alternate" hreflang="x-default" href="{escape(provider_page_url(base_url, 'zh-CN', profile.slug), quote=True)}">
+    <link rel="alternate" hreflang="x-default" href="{escape(provider_page_url(base_url, 'en', profile.slug), quote=True)}">
     <meta property="og:type" content="website"><meta property="og:title" content="{escape(title, quote=True)}">
     <meta property="og:description" content="{escape(description, quote=True)}"><meta property="og:url" content="{escape(canonical, quote=True)}">
     <link rel="icon" href="../../../favicon.svg" type="image/svg+xml">

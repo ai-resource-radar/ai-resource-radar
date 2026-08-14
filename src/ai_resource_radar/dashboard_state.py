@@ -57,6 +57,7 @@ class AiRadarDashboard:
     path: Path
     poster_root: Path | None = None
     project_root: Path | None = None
+    default_locale: str = "en"
     _lock: Lock = field(default_factory=Lock)
     _state: dict[str, Any] = field(
         default_factory=lambda: {
@@ -87,7 +88,12 @@ class AiRadarDashboard:
     )
 
     def summary(self) -> dict[str, Any]:
-        return radar_summary(self.path)
+        payload = radar_summary(self.path)
+        payload["default_locale"] = (
+            self.default_locale if self.default_locale in {"en", "zh-CN"} else "en"
+        )
+        payload["supported_locales"] = ["en", "zh-CN"]
+        return payload
 
     def schema_error(self) -> dict[str, Any] | None:
         if not self.path.exists():

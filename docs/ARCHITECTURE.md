@@ -3,14 +3,16 @@
 The supported user path is deliberately narrow, while compatibility code remains isolated:
 
 1. **Deterministic radar** — allow-listed fetchers parse official/community sources, normalize offers, rank them with transparent A–D tiers, detect changes, and store compact evidence in SQLite. This powers the local Dashboard and the public free-resource/price snapshot.
-2. **Retained poster backend** — the historical provider, OCR, report, and API paths remain isolated for stored-report and host compatibility. The v0.7.3 Dashboard does not expose or request them; legacy poster routes return to the recommended radar view.
+2. **Retained poster backend** — the historical provider, OCR, report, and API paths remain isolated for stored-report and host compatibility. The v0.9 Dashboard does not expose or request them; legacy poster routes return to the recommended radar view.
 
 Core modules:
 
 - `collection`: source models, the 23-source registry, allow-listed acquisition metadata, and
   source-specific parsers. The historical `sources` path is a compatibility facade.
-- `persistence`: schema v7, migrations, repositories, evidence, changes, and retention. The
+- `persistence`: schema v8, migrations, repositories, evidence, changes, and retention. The
   historical `store` path remains compatible.
+- `regions`: versioned ISO country validation, region presets, strict availability resolution,
+  and compatibility derivation for the historical mainland field.
 - `application`: refresh orchestration, failure isolation, change detection, and maintenance.
   The historical `runtime` path remains compatible.
 - `pricing`: normalized token and GPU price queries.
@@ -28,9 +30,10 @@ The browser UI is dependency-free. Native modules separate API cancellation, URL
 formatters, components, and view renderers; CSS is split into token, base, layout, component,
 view, and responsive layers. Legacy `/ai-resources.js` and `/ai-resources.css` remain entry points.
 
-SQLite schema v7 adds transactional multi-tip application batches and retains the local poster
-benchmark/review audit while preserving all v6 resources, modalities, notifications, daily reports,
-tips, and evidence. The v0.7.3 Dashboard does not start poster generation or load poster images;
-existing reports and audit rows remain readable through backend compatibility paths.
+SQLite schema v8 adds evidence-backed country availability, tri-state signup requirements, and
+localized offer presentations while preserving all schema-v7 resources, modalities, notifications,
+daily reports, tips, evidence, and tip batches. The v0.9 Dashboard does not start poster generation
+or load poster images; existing reports and audit rows remain readable through backend compatibility
+paths.
 
 `ai-resource-radar` is the sole implementation of the radar core. A host such as Computer Health may provide its own paths, port, and LaunchAgent labels, but must call this package rather than copy collectors or storage code. Lock files live next to the selected database so different entry points coordinate on the same resource.

@@ -169,6 +169,16 @@ def route_radar_get(
         return ApiResponse.json(200, tip)
     if path == "/api/ai-resources":
         mainland_value = _text(values, "mainland")
+        country_value = _text(values, "country")
+        region_value = _text(values, "region")
+        if sum(bool(value) for value in (mainland_value, country_value, region_value)) > 1:
+            return ApiResponse.json(
+                400,
+                {
+                    "error": "invalid_ai_resource_filter",
+                    "code": "country_region_mainland_mutually_exclusive",
+                },
+            )
         mainland = (
             tuple(item for item in mainland_value.split(",") if item)
             if mainland_value
@@ -183,12 +193,22 @@ def route_radar_get(
                     _text(values, "free_image_generation", "false") == "true"
                 ),
                 mainland=mainland,
+                country=country_value or None,
+                region=region_value or None,
+                include_unknown_region=_bool(values, "include_unknown_region"),
+                locale=_text(values, "locale", "en"),
                 query=_text(values, "q") or None,
                 limit=_int(values, "limit", 100),
                 offset=_int(values, "offset", 0),
             )
-        except (TypeError, ValueError):
-            return ApiResponse.json(400, {"error": "invalid_ai_resource_filter"})
+        except (TypeError, ValueError) as exc:
+            return ApiResponse.json(
+                400,
+                {
+                    "error": "invalid_ai_resource_filter",
+                    "code": str(exc) or "invalid_ai_resource_filter",
+                },
+            )
         return ApiResponse.json(
             200,
             {"schema_version": "2.0", "count": len(resources), "resources": resources},
@@ -398,6 +418,17 @@ def route_radar_post(
 def _text(query: Query, key: str, default: str = "") -> str:
     values = query.get(key)
     return values[0] if values else default
+
+
+def _bool(query: Query, key: str, default: bool = False) -> bool:
+    value = _text(query, key, "")
+    if not value:
+        return default
+    if value == "true":
+        return True
+    if value == "false":
+        return False
+    raise ValueError(f"invalid_{key}")
 
 
 def _int(query: Query, key: str, default: int) -> int:

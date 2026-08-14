@@ -50,8 +50,12 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn('window.addEventListener("popstate", restoreRoute)', module)
         self.assertIn('registry.resources?.loadResources?.(ctx)', module)
         self.assertIn("FILTER_KEYS", module)
-        for route_filter in ("verified", "mainland", "provider", "tip_status"):
+        for route_filter in (
+            "verified", "country", "region", "include_unknown_region",
+            "provider", "tip_status",
+        ):
             self.assertIn(f'"{route_filter}"', module)
+        self.assertNotIn('"mainland"', module)
         self.assertIn("createDialogController", javascript + module)
         self.assertIn('/api/ai-resources/providers', module)
         self.assertIn('integration-disclosure', module)

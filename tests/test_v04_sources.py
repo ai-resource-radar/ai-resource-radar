@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 import unittest
 
 from ai_resource_radar.pricing import list_gpu_prices, list_token_prices
@@ -33,6 +34,21 @@ class V04SourceTests(unittest.TestCase):
             self.assertTrue(source.url.startswith("https://"))
             self.assertTrue(source.allowed_hosts)
             self.assertEqual(source.cadence_hours, 24)
+
+    def test_official_fixture_presentations_are_bilingual_and_english_safe(self) -> None:
+        for source_id in SOURCE_FIXTURES:
+            with self.subTest(source_id=source_id):
+                for item in self._records(source_id):
+                    if item.verification_level not in {"official_api", "official_page"}:
+                        continue
+                    self.assertEqual(set(item.presentations), {"en", "zh-CN"})
+                    self.assertFalse(
+                        any(
+                            re.search(r"[\u3400-\u9fff]", value or "")
+                            for value in item.presentations["en"].values()
+                            if isinstance(value, str)
+                        )
+                    )
 
     def test_free_policy_tiers_and_risks(self) -> None:
         samba = self._records("sambanova-free-tier")

@@ -222,7 +222,7 @@ def _safe_external_url(value: Any) -> str:
 
 
 def _presentation(row: Mapping[str, Any], locale: str) -> Mapping[str, Any]:
-    catalog = row.get("presentation")
+    catalog = row.get("presentations") or row.get("presentation")
     if not isinstance(catalog, Mapping):
         return {}
     value = catalog.get(locale)
@@ -230,7 +230,14 @@ def _presentation(row: Mapping[str, Any], locale: str) -> Mapping[str, Any]:
         return value
     # A few older direct fixtures use ``zh`` as their key.
     value = catalog.get("zh") if locale != "en" else catalog.get("en")
-    return value if isinstance(value, Mapping) else {}
+    if isinstance(value, Mapping):
+        return value
+    if locale == "en":
+        return {
+            "benefit_summary": "See the official page for the current public policy.",
+            "usage_steps": ["Open the official page and follow the account instructions."],
+        }
+    return {}
 
 
 def _evidence(row: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -355,10 +362,10 @@ def scenario_rows(
             continue
         if definition.recurring and str(row.get("offer_type") or "").lower() != "recurring_free":
             continue
-        # ``supported`` is intentionally an exact normalized value.  Unknown,
-        # unsupported and differently-cased values must never be advertised as
-        # mainland availability.
-        if definition.mainland_supported and row.get("mainland_status") != "supported":
+        # The historical mainland scenario is now the CN specialization of
+        # the generic country model.  Legacy rows remain readable, but an
+        # explicit schema-v8 country assertion takes precedence.
+        if definition.mainland_supported and _country_status(row, "CN") != "supported":
             continue
         if definition.free_image and not _is_true(row.get("free_image_generation")):
             continue
@@ -395,6 +402,30 @@ def scenario_rows(
     if require_minimum:
         _ensure_minimum(definition, selected)
     return selected
+
+
+def _country_status(row: Mapping[str, Any], country: str) -> str:
+    availability = row.get("availability")
+    if isinstance(availability, Mapping):
+        supported = {
+            str(value).strip().upper()
+            for value in availability.get("supported_countries", ())
+        }
+        unsupported = {
+            str(value).strip().upper()
+            for value in availability.get("unsupported_countries", ())
+        }
+        code = country.strip().upper()
+        if code in unsupported:
+            return "unsupported"
+        if code in supported:
+            return "supported"
+        if str(availability.get("scope") or "").strip().lower() == "global":
+            return "supported"
+        # A schema-v8 projection is authoritative even when it contains no
+        # assertion for this country; absence means unknown.
+        return "unknown"
+    return str(row.get("mainland_status") or "unknown").strip().lower()
 
 
 def aggregate_providers(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -560,22 +591,35 @@ def render_scenario_page(
         threshold_parts: list[str] = []
         card = row.get("requires_card")
         phone = row.get("requires_phone")
-        mainland = row.get("mainland_status")
-        eligibility = row.get("eligibility")
+        availability = row.get("availability")
+        # Eligibility from older datasets can be free-form Chinese policy
+        # prose.  English pages only render it when an explicitly English
+        # presentation is available.
+        eligibility = row.get("eligibility") if language != "en" else None
         if card:
             threshold_parts.append(("无需信用卡" if language != "en" and str(card) == "no" else "No card" if language == "en" and str(card) == "no" else f"Card: {card}"))
         if phone and str(phone).lower() not in {"unknown", "none", ""}:
             threshold_parts.append(("无需手机号" if language != "en" and str(phone) == "no" else f"Phone: {phone}"))
-        if mainland:
-            mainland_labels = {
-                "supported": ("大陆可用", "Mainland supported"),
-                "unknown": ("大陆状态待确认", "Mainland status unknown"),
-                "unsupported": ("大陆不支持", "Mainland unsupported"),
+        if isinstance(availability, Mapping):
+            scope = str(availability.get("scope") or "unknown").strip().lower()
+            availability_labels = {
+                "global": ("官方标注为全球可用", "Officially marked global"),
+                "restricted": ("存在地区限制", "Regional restrictions apply"),
+                "unknown": ("地区可用性待官方确认", "Regional availability unknown"),
             }
-            zh_label, en_label = mainland_labels.get(
-                str(mainland).strip().lower(),
-                (f"大陆：{mainland}", f"Mainland: {mainland}"),
+            zh_label, en_label = availability_labels.get(
+                scope, availability_labels["unknown"]
             )
+            threshold_parts.append(en_label if language == "en" else zh_label)
+        elif row.get("mainland_status"):
+            # Compatibility-only presentation for older public snapshots.
+            status = str(row.get("mainland_status")).strip().lower()
+            legacy_labels = {
+                "supported": ("中国可用", "China supported"),
+                "unknown": ("中国可用性待确认", "China availability unknown"),
+                "unsupported": ("中国不支持", "China unsupported"),
+            }
+            zh_label, en_label = legacy_labels.get(status, legacy_labels["unknown"])
             threshold_parts.append(en_label if language == "en" else zh_label)
         if eligibility:
             threshold_parts.append(str(eligibility))
@@ -660,7 +704,7 @@ def render_scenario_page(
         f'  <link rel="canonical" href="{escape(canonical, quote=True)}">\n'
         f'  <link rel="alternate" hreflang="zh-CN" href="{escape(scenario_page_url(base_url, "zh-CN", definition.slug), quote=True)}">\n'
         f'  <link rel="alternate" hreflang="en" href="{escape(scenario_page_url(base_url, "en", definition.slug), quote=True)}">\n'
-        f'  <link rel="alternate" hreflang="x-default" href="{escape(scenario_page_url(base_url, "zh-CN", definition.slug), quote=True)}">\n'
+        f'  <link rel="alternate" hreflang="x-default" href="{escape(scenario_page_url(base_url, "en", definition.slug), quote=True)}">\n'
         f'  <link rel="alternate" type="application/atom+xml" title="AI Resource Radar Atom" href="{escape(feed_base + feed_prefix + "feed.xml", quote=True)}">\n'
         f'  <link rel="alternate" type="application/rss+xml" title="AI Resource Radar RSS" href="{escape(feed_base + feed_prefix + "rss.xml", quote=True)}">\n'
         f'  <link rel="stylesheet" href="{escape(stylesheet_href, quote=True)}">\n'
@@ -711,7 +755,7 @@ def render_scenario_confirmation_page(
         f'  <link rel="canonical" href="{escape(canonical, quote=True)}">\n'
         f'  <link rel="alternate" hreflang="zh-CN" href="{escape(scenario_confirmation_url(base_url, "zh-CN", definition.slug), quote=True)}">\n'
         f'  <link rel="alternate" hreflang="en" href="{escape(scenario_confirmation_url(base_url, "en", definition.slug), quote=True)}">\n'
-        f'  <link rel="alternate" hreflang="x-default" href="{escape(scenario_confirmation_url(base_url, "zh-CN", definition.slug), quote=True)}">\n'
+        f'  <link rel="alternate" hreflang="x-default" href="{escape(scenario_confirmation_url(base_url, "en", definition.slug), quote=True)}">\n'
         f'  <link rel="stylesheet" href="{escape(stylesheet_href, quote=True)}">\n'
         '</head>\n'
         f'<body><main class="scenario-confirmation" data-scenario-slug="{escape(definition.slug, quote=True)}"><p>{escape(message)}</p><code>{escape(definition.slug)}</code><p><a href="{escape(scenario_page_url(base_url, language, definition.slug), quote=True)}">{escape("返回场景页" if language != "en" else "Return to scenario")}</a></p></main></body>\n'
@@ -835,7 +879,7 @@ def build_scenario_pages(
                         "active": True,
                         "requires_card": definition.requires_card,
                         "recurring": definition.recurring,
-                        "mainland_status": "supported" if definition.mainland_supported else None,
+                        "country": "CN" if definition.mainland_supported else None,
                         "free_image_generation": definition.free_image,
                         "protocol": "chat_completions" if definition.openai_compatible else None,
                         "source_revision": str(source_revision or "local")[:64],

@@ -144,7 +144,7 @@ class InterfaceContractTests(unittest.TestCase):
             rendered = output.read_text(encoding="utf-8")
 
         self.assertEqual(exit_code, 0)
-        self.assertIn("# AI 资源雷达", rendered)
+        self.assertIn("# AI Resource Radar", rendered)
         self.assertIn("Example / Free API", rendered)
 
 

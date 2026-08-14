@@ -15,6 +15,7 @@ class CliContext:
     project_root: Path | None = None
     doctor: Callable[[Path], object] | None = None
     list_format: str = "json"
+    default_locale: str = "en"
 
 
 def run_cli(argv: list[str] | None = None, *, context: CliContext | None = None) -> int:

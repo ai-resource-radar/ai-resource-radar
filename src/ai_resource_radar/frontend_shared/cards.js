@@ -1,11 +1,11 @@
 import { element, safeLink } from "./dom.js";
 import {
   actionUrl,
+  availabilityLabel,
   benefitSummary,
   cardLabel,
   formatTime,
   kindLabel,
-  mainlandLabel,
   quotaText,
   usageSteps,
   verificationLabel,
@@ -54,7 +54,7 @@ export function createOfferCard(resource, options = {}) {
   const steps = usageSteps(resource, locale);
   const evidence = resource.evidence || {};
   [
-    [copy.threshold, `${cardLabel(resource.requires_card, locale)} · ${mainlandLabel(resource.mainland_status, locale)}`],
+    [copy.threshold, `${cardLabel(resource.requires_card, locale)} · ${availabilityLabel(options.availabilityStatus || resource.availability_status, locale, resource.availability_scope)}`],
     [copy.how, steps[0] || (locale === "en" ? "Open the official page and follow its account steps." : "打开官方页面，按账号指引领取。")],
     [copy.evidence, `${verificationLabel(resource.verification_level, locale)} · ${copy.verified} ${formatTime(evidence.observed_at || resource.last_seen_at, locale)}`],
   ].forEach(([label, value]) => {

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import re
 from typing import Any
 
@@ -18,6 +18,48 @@ class RadarSource:
     cadence_hours: int
     format: str
     allowed_hosts: tuple[str, ...]
+
+
+def default_presentations(
+    *, provider: str, title: str, eligibility: str | None = None
+) -> dict[str, dict[str, str]]:
+    """Build deterministic, offline-safe default EN and zh-CN presentations."""
+
+    has_cjk_eligibility = bool(eligibility and re.search(r"[\u3400-\u9fff]", eligibility))
+    has_cjk_title = bool(re.search(r"[\u3400-\u9fff]", title))
+    english_provider = "Official provider" if re.search(r"[\u3400-\u9fff]", provider) else provider
+    english_title = f"{english_provider} official offer" if has_cjk_title else title
+    english_summary = (
+        "Official offer details are verified from the source."
+        if has_cjk_eligibility else eligibility or "Official offer details are verified from the source."
+    )
+    chinese_title = title if has_cjk_title else f"{title} 免费资源"
+    chinese_summary = (
+        eligibility
+        if eligibility and re.search(r"[\u3400-\u9fff]", eligibility)
+        else f"{provider} 的官方资源；请以来源页面中的资格与额度说明为准。"
+    )
+    return {
+        "en": {
+            "title": english_title,
+            "benefit_summary": english_summary,
+            "eligibility": (
+                "See the official source for eligibility."
+                if has_cjk_eligibility else eligibility or "See the official source for eligibility."
+            ),
+            "usage_steps": (),
+            "limitations": (),
+        },
+        "zh-CN": {
+            "title": chinese_title,
+            "benefit_summary": chinese_summary,
+            "eligibility": (
+                eligibility if has_cjk_eligibility else "请以官方来源中的资格说明为准。"
+            ),
+            "usage_steps": (),
+            "limitations": (),
+        },
+    }
 
 
 @dataclass(frozen=True)
@@ -45,6 +87,35 @@ class OfferObservation:
     # from generating images (image output).
     input_modalities: tuple[str, ...] = ()
     output_modalities: tuple[str, ...] = ()
+    # The old card and phone fields remain first-class public fields.  The
+    # v0.9 fields complete the six tri-state signup-friction dimensions.
+    requires_identity_verification: str = "unknown"
+    requires_paid_topup: str = "unknown"
+    requires_waitlist: str = "unknown"
+    requires_organization: str = "unknown"
+    availability_scope: str = "unknown"
+    # Country records only contain affirmative supported/unsupported evidence;
+    # unknown is represented by an absent record and the enclosing scope.
+    availability: dict[str, str] = field(default_factory=dict)
+    presentations: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+    def signup_requirements(self) -> dict[str, str]:
+        """Return the stable six-field tri-state signup requirement map."""
+
+        return {
+            "card": _legacy_requirement(self.requires_card),
+            "phone": _legacy_requirement(self.requires_phone),
+            "identity_verification": self.requires_identity_verification,
+            "paid_topup": self.requires_paid_topup,
+            "waitlist": self.requires_waitlist,
+            "organization": self.requires_organization,
+        }
+
+
+def _legacy_requirement(value: str) -> str:
+    return {"yes": "required", "no": "not_required", "unknown": "unknown"}.get(
+        value, "unknown"
+    )
 
 
 _MODALITY_ALIASES = {
@@ -105,4 +176,10 @@ def resolve_modalities(
     return inputs, outputs
 
 
-__all__ = ["OfferObservation", "RadarSource", "normalize_modalities", "resolve_modalities"]
+__all__ = [
+    "OfferObservation",
+    "RadarSource",
+    "default_presentations",
+    "normalize_modalities",
+    "resolve_modalities",
+]

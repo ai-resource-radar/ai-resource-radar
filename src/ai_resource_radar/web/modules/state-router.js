@@ -9,7 +9,8 @@ export const KNOWN_VIEWS = new Set([
 ]);
 
 const FILTER_KEYS = new Set([
-  "verified", "no_card", "image", "mainland",
+  "verified", "no_card", "image",
+  "country", "region", "include_unknown_region",
   "sort", "direction", "provider", "verification", "min_context",
   "max_typical", "max_input", "max_output", "cache", "gpu", "min_vram",
   "max_hourly", "billing", "tier", "price_mode", "hours", "advanced",
@@ -20,15 +21,19 @@ export function readRoute() {
   const route = readDashboardRoute(KNOWN_VIEWS);
   const params = new URLSearchParams(window.location.search);
   route.filters = {};
+  route.locale = params.get("lang") || params.get("locale") || "";
   FILTER_KEYS.forEach((key) => {
     if (params.has(key)) route.filters[key] = params.get(key);
   });
   return route;
 }
 
-export function writeRoute(view, query, filters = {}) {
+export function writeRoute(view, query, filters = {}, locale = "") {
   writeDashboardRoute({ view, query });
   const url = new URL(window.location.href);
+  url.searchParams.delete("locale");
+  url.searchParams.delete("lang");
+  if (locale === "en" || locale === "zh-CN") url.searchParams.set("lang", locale);
   FILTER_KEYS.forEach((key) => url.searchParams.delete(key));
   Object.entries(filters).forEach(([key, value]) => {
     if (FILTER_KEYS.has(key) && value !== "" && value !== null && value !== undefined) {

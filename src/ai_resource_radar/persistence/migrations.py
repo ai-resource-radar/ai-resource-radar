@@ -7,6 +7,7 @@ import json
 import sqlite3
 from typing import Any
 
+from ai_resource_radar.collection.models import default_presentations
 from ai_resource_radar.sources import resolve_modalities
 
 def _json(value: Any) -> str:
@@ -127,5 +128,128 @@ def _backfill_modality_fields(connection: sqlite3.Connection) -> None:
         )
 
 
+def _backfill_v8_fields(connection: sqlite3.Connection) -> None:
+    """Backfill v0.9 region data without creating a refresh-side effect.
 
-__all__ = []
+    Schema v7 recorded exactly one availability assertion: ``mainland_status``.
+    It is conservative and lossless to store that assertion under ISO2 ``CN``;
+    no claim is made for a country which had no previous evidence.  This helper
+    is called only by the transactional schema initializer and intentionally
+    never touches ``offer_changes`` or ``notifications``.
+    """
+
+    required = {
+        "requires_identity_verification",
+        "requires_paid_topup",
+        "requires_waitlist",
+        "requires_organization",
+        "availability_scope",
+    }
+    if not required <= _columns(connection, "offers"):
+        return
+    rows = connection.execute("SELECT * FROM offers").fetchall()
+    for row in rows:
+        mainland = str(row["mainland_status"] or "unknown")
+        if mainland not in {"supported", "unknown", "unsupported"}:
+            mainland = "unknown"
+        connection.execute(
+            """
+            UPDATE offers SET requires_identity_verification =
+                    COALESCE(NULLIF(requires_identity_verification, ''), 'unknown'),
+                requires_paid_topup = COALESCE(NULLIF(requires_paid_topup, ''), 'unknown'),
+                requires_waitlist = COALESCE(NULLIF(requires_waitlist, ''), 'unknown'),
+                requires_organization = COALESCE(NULLIF(requires_organization, ''), 'unknown'),
+                availability_scope = CASE
+                    WHEN ? IN ('supported', 'unsupported') THEN 'restricted'
+                    ELSE 'unknown' END
+            WHERE offer_id = ?
+            """,
+            (mainland, row["offer_id"]),
+        )
+        scope = "restricted" if mainland in {"supported", "unsupported"} else "unknown"
+        if mainland == "unknown":
+            availability: dict[str, str] = {}
+        else:
+            connection.execute(
+                """
+                INSERT INTO offer_availability(
+                    offer_id, country_code, availability_status, source_url,
+                    evidence_excerpt, observed_at
+                )
+                VALUES (?, 'CN', ?, ?, ?, ?)
+                ON CONFLICT(offer_id, country_code) DO NOTHING
+                """,
+                (
+                    row["offer_id"],
+                    mainland,
+                    row["homepage_url"],
+                    "Migrated from schema-v7 mainland_status.",
+                    row["last_seen_at"],
+                ),
+            )
+            availability = {"CN": mainland}
+        presentations = default_presentations(
+            provider=str(row["provider"]),
+            title=str(row["title"]),
+            eligibility=row["eligibility"],
+        )
+        for locale, presentation in presentations.items():
+            connection.execute(
+                """
+                INSERT INTO offer_presentations(
+                    offer_id, presentation, locale, title, benefit_summary,
+                    eligibility, usage_steps_json, limitations_json
+                ) VALUES (?, 'default', ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(offer_id, presentation, locale) DO NOTHING
+                """,
+                (
+                    row["offer_id"],
+                    locale,
+                    presentation.get("title"),
+                    presentation.get("benefit_summary"),
+                    presentation.get("eligibility"),
+                    _json(presentation.get("usage_steps") or ()),
+                    _json(presentation.get("limitations") or ()),
+                ),
+            )
+        try:
+            reasons = json.loads(row["priority_reasons_json"] or "[]")
+        except (TypeError, ValueError):
+            reasons = []
+        try:
+            details = json.loads(row["details_json"] or "{}")
+        except (TypeError, ValueError):
+            details = {}
+        payload = {
+            "offer_id": row["offer_id"], "provider": row["provider"],
+            "title": row["title"], "kind": row["kind"],
+            "offer_type": row["offer_type"], "quota_value": row["quota_value"],
+            "quota_unit": row["quota_unit"], "reset_period": row["reset_period"],
+            "estimated_usd_value": row["estimated_usd_value"],
+            "requires_card": row["requires_card"], "requires_phone": row["requires_phone"],
+            "requires_identity_verification": "unknown", "requires_paid_topup": "unknown",
+            "requires_waitlist": "unknown", "requires_organization": "unknown",
+            "signup_requirements": {
+                "card": {"yes": "required", "no": "not_required"}.get(row["requires_card"], "unknown"),
+                "phone": {"yes": "required", "no": "not_required"}.get(row["requires_phone"], "unknown"),
+                "identity_verification": "unknown", "paid_topup": "unknown",
+                "waitlist": "unknown", "organization": "unknown",
+            },
+            "eligibility": row["eligibility"], "mainland_status": mainland,
+            "availability_scope": scope, "availability": availability,
+            "expires_at": row["expires_at"], "homepage_url": row["homepage_url"],
+            "verification_level": row["verification_level"],
+            "priority_tier": row["priority_tier"], "priority_reasons": reasons,
+            "details": details,
+            "input_modalities": list(_decode_json_list(row["input_modalities_json"])),
+            "output_modalities": list(_decode_json_list(row["output_modalities_json"])),
+            "free_image_generation": bool(row["free_image_generation"]),
+        }
+        connection.execute(
+            "UPDATE offers SET fingerprint = ? WHERE offer_id = ?",
+            (hashlib.sha256(_json(payload).encode()).hexdigest(), row["offer_id"]),
+        )
+
+
+
+__all__ = ["_backfill_modality_fields", "_backfill_v8_fields"]

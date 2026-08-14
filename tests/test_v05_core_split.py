@@ -49,7 +49,7 @@ class CoreSplitTests(unittest.TestCase):
         self.assertIsNot(legacy, schema)
         self.assertIsNot(legacy, repository)
         self.assertIsNot(legacy, maintenance)
-        self.assertEqual(legacy.SCHEMA_VERSION, 7)
+        self.assertEqual(legacy.SCHEMA_VERSION, 8)
         self.assertIs(connection.UnsupportedSchemaError, legacy.UnsupportedSchemaError)
         self.assertIs(schema._create_v7_schema, legacy._create_v7_schema)
         self.assertIs(maintenance.StorageMaintenanceResult, legacy.StorageMaintenanceResult)
@@ -79,14 +79,14 @@ class CoreSplitTests(unittest.TestCase):
         self.assertIs(repository.add_tip, tips.add_tip)
         self.assertIs(repository.get_tip, tips.get_tip)
 
-    def test_schema7_is_initialized_through_internal_connection(self) -> None:
+    def test_schema8_is_initialized_through_internal_connection(self) -> None:
         store = importlib.import_module("ai_resource_radar.store")
         with TemporaryDirectory() as temporary:
             path = Path(temporary) / "radar.sqlite3"
             connection = store.connect(path)
             try:
                 version = connection.execute("PRAGMA user_version").fetchone()[0]
-                self.assertEqual(version, 7)
+                self.assertEqual(version, 8)
             finally:
                 connection.close()
 

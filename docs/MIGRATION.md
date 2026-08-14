@@ -1,5 +1,24 @@
 # Migrating installed services
 
+## v0.8 to v0.9
+
+v0.9 migrates SQLite schema v7 to v8 in one transaction. Existing offers, evidence, changes,
+notifications, tips, reports, source cache state, and maintenance metadata are retained. Existing
+`mainland_status=supported` or `unsupported` values become explicit `CN` availability facts;
+`unknown` remains unknown and is never widened to global availability.
+
+The migration adds country availability, tri-state signup requirements, and English/Chinese offer
+presentations. It recalculates transparent A–D tiers without treating country availability as a
+quality grade. Migration-only backfill and tier changes do not create offer changes or notifications.
+The historical `mainland_status` field and `--mainland` CLI option remain available as deprecated
+compatibility views over the country model.
+
+Installed Computer Health users must upgrade to the host version that supports schema v8 before the
+new database is opened. The supported rollout prepares the new runtime, creates and verifies an
+online schema-v7 backup, stops the old services, migrates once, starts the schema-v8 runtime, and
+runs Doctor. If verification fails, restore both the previous runtime and its matching database
+backup; an older runtime must never be pointed at a schema-v8 database.
+
 ## v0.7.0 to v0.7.1
 
 This release does not change SQLite schema v7 or move any database, poster, report, or cache

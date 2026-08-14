@@ -7,7 +7,13 @@ import json
 import re
 from typing import Any
 
-from .models import OfferObservation, RadarSource, normalize_modalities, resolve_modalities
+from .models import (
+    OfferObservation,
+    RadarSource,
+    default_presentations,
+    normalize_modalities,
+    resolve_modalities,
+)
 from .registry import OFFICIAL_GUIDES, SOURCE_BY_ID, SOURCES, official_guide
 
 
@@ -83,6 +89,13 @@ def _official_offer(
     details: dict[str, Any] | None = None,
     input_modalities: Any = None,
     output_modalities: Any = None,
+    availability_scope: str | None = None,
+    availability: dict[str, str] | None = None,
+    requires_identity_verification: str = "unknown",
+    requires_paid_topup: str = "unknown",
+    requires_waitlist: str = "unknown",
+    requires_organization: str = "unknown",
+    presentations: dict[str, dict[str, Any]] | None = None,
 ) -> OfferObservation:
     normalized_details = (
         official_guide(provider, offer_type)
@@ -119,6 +132,25 @@ def _official_offer(
         details=normalized_details,
         input_modalities=resolved_inputs,
         output_modalities=resolved_outputs,
+        requires_identity_verification=requires_identity_verification,
+        requires_paid_topup=requires_paid_topup,
+        requires_waitlist=requires_waitlist,
+        requires_organization=requires_organization,
+        # Existing source parsers only make an explicit China-mainland claim.
+        # Preserve that claim as one country record; later source additions can
+        # provide a broader availability map without changing this helper.
+        availability_scope=availability_scope or (
+            "restricted" if mainland_status in {"supported", "unsupported"} else "unknown"
+        ),
+        availability=availability or (
+            {"CN": mainland_status}
+            if mainland_status in {"supported", "unsupported"}
+            else {}
+        ),
+        presentations=presentations
+        or default_presentations(
+            provider=provider, title=title, eligibility=eligibility
+        ),
     )
 
 

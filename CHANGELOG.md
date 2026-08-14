@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.9.0 — Unreleased
+
+- Make the hosted root and standalone Dashboard English-first while retaining a complete Chinese
+  catalogue at `/zh/` and a host-selectable default locale.
+- Upgrade SQLite to schema v8 with evidence-backed ISO country availability, explicit signup
+  requirements, and deterministic English/Chinese offer presentations.
+- Add compatible country and region filters across CLI, local API, Dashboard, public exports, and
+  scenario generation. The historical mainland field and CLI option remain as deprecated aliases.
+- Remove mainland availability from A–D classification. Unknown regional availability is never
+  presented as supported, and region-filtered results include unknown offers only on request.
+- Keep the same 23 deterministic sources, USD comparison basis, local-first privacy model, and
+  paused poster behavior; no AI translation, geolocation, cookies, or exchange-rate service is added.
+
 ## 0.8.0 — 2026-08-12
 
 - Add six bilingual, crawlable scenario pages and four public Atom/RSS feed endpoints with stable

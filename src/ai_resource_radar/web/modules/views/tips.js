@@ -1,6 +1,7 @@
 /* AI productivity tips review and import view. */
 import { formatTime } from "/ai-radar-assets/modules/formatters.js";
 import { activateCard, element, metric, safeLink } from "/ai-radar-assets/modules/components.js";
+import { tr } from "/ai-radar-assets/modules/i18n.js";
 
 export const viewId = "tips";
 export const section = "工具";
@@ -11,7 +12,20 @@ const tipCategoryLabels = {
 };
 
 function tipStatusLabel(value) {
-  return { candidate: "待审核", approved: "已批准", rejected: "已拒绝", retired: "已撤回" }[value] || value;
+  const labels = {
+    candidate: ["Pending review", "待审核"], approved: ["Approved", "已批准"],
+    rejected: ["Rejected", "已拒绝"], retired: ["Retired", "已撤回"],
+  };
+  return labels[value] ? tr(...labels[value]) : value;
+}
+
+function tipCategoryLabel(value) {
+  const chinese = tipCategoryLabels[value];
+  const english = {
+    delegation: "Delegation", prompting: "Prompting", context: "Context",
+    verification: "Testing", cost: "Cost control", security: "Security",
+  }[value];
+  return english ? tr(english, chinese) : value;
 }
 
 async function reviewTip(tipId, action, scope, ctx) {
@@ -29,7 +43,7 @@ async function reviewTip(tipId, action, scope, ctx) {
 
 function openTip(tip, trigger, ctx) {
   ctx.dom.detailRoot.replaceChildren(
-    element("span", "tip-status", `${tipStatusLabel(tip.status)} · ${tipCategoryLabels[tip.category] || tip.category}`),
+    element("span", "tip-status", `${tipStatusLabel(tip.status)} · ${tipCategoryLabel(tip.category)}`),
     element("h2", "", tip.title),
     element("p", "offer-provider", tip.summary),
   );
@@ -73,10 +87,10 @@ function openTip(tip, trigger, ctx) {
 function tipCard(tip, ctx) {
   const card = element("article", "tip-card");
   card.append(
-    element("span", `tip-status ${tip.status}`, `${tipStatusLabel(tip.status)} · ${tipCategoryLabels[tip.category] || tip.category}`),
+    element("span", `tip-status ${tip.status}`, `${tipStatusLabel(tip.status)} · ${tipCategoryLabel(tip.category)}`),
     element("h3", "", tip.title),
     element("p", "", tip.summary),
-    element("small", "", `${tip.source_type === "official" ? "官方来源" : "手动导入"} · 风险 ${tip.risk_level}`),
+    element("small", "", `${tip.source_type === "official" ? tr("Official source", "官方来源") : tr("Manual import", "手动导入")} · ${tr("Risk", "风险")} ${tip.risk_level}`),
   );
   activateCard(card, (trigger) => openTip(tip, trigger, ctx));
   return card;
@@ -199,7 +213,7 @@ export async function loadTips(ctx) {
       audit.append(element("h3", "", "最近规则应用"));
       applications.applications.forEach((item) => {
         const row = element("div", "tip-audit-row");
-        row.append(element("span", "", `${item.scope === "global" ? "全局" : "项目"} · ${item.title}`), element("small", "", `${item.status} · ${formatTime(item.applied_at)}`));
+        row.append(element("span", "", `${item.scope === "global" ? tr("Global", "全局") : tr("Project", "项目")} · ${item.title}`), element("small", "", `${item.status} · ${formatTime(item.applied_at)}`));
         if (item.status === "applied") {
           const button = element("button", "tip-rollback", "回滚");
           button.type = "button";
