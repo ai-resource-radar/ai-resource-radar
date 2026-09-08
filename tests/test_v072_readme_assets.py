@@ -36,6 +36,21 @@ class ReadmeAssetTests(unittest.TestCase):
         for name in ("public-radar.png", "dashboard.png", "poster-sample.webp"):
             self.assertFalse((ASSETS / name).exists(), name)
 
+    def test_bilingual_readmes_lead_with_decision_paths_and_a_bounded_star_cta(self) -> None:
+        english = (ROOT / "README.md").read_text(encoding="utf-8")
+        chinese = (ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
+        for slug in (
+            "free-ai-api-no-card",
+            "free-gpu-compute",
+            "mainland-supported-free-ai-api",
+        ):
+            self.assertIn(f"/en/scenarios/{slug}/", english)
+            self.assertIn(f"/zh/scenarios/{slug}/", chinese)
+        self.assertIn("star the repository", english)
+        self.assertIn("为仓库加星", chinese)
+        self.assertNotIn("| AI efficiency tips |", english)
+        self.assertNotIn("| AI 效率技巧 |", chinese)
+
 
 if __name__ == "__main__":
     unittest.main()

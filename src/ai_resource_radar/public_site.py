@@ -506,12 +506,12 @@ def _scenario_directory(pages: Iterable[Any], *, locale: str = "en") -> str:
 
 _ZH_HOMEPAGE_COPY = {
     "health.loading": "读取来源状态", "health.title": "来源核验状态",
-    "header.github": "查看 GitHub",
+    "header.github": "在 GitHub 加星",
     "nav.free": "免费资源", "nav.prices": "价格榜单",
     "view.recommended": "全部精选", "view.token": "免费 Token", "view.gpu": "免费 GPU",
     "view.grant": "资助活动", "view.tokenPrices": "Token 价格", "view.gpuPrices": "GPU 价格",
     "hero.title": "今天有哪些真正能领的免费 AI 资源？",
-    "hero.description": "额度、门槛、领取步骤和官方证据一次看清。", "hero.updated": "数据核验时间",
+    "hero.description": "核验额度、无需信用卡选项、地区可用性、领取步骤和官方证据一次看清。", "hero.updated": "数据核验时间",
     "featured.title": "今天最值得领", "featured.note": "不同供应商 · 无需信用卡优先",
     "changes.title": "最近重要变化", "catalog.title": "完整资源目录",
     "catalog.caption": "按供应商、核验、注册门槛和国家可用性筛选。",
@@ -557,6 +557,10 @@ def _localize_homepage_zh(content: str, *, canonical: str) -> str:
     content = content.replace(
         "Daily-verified free AI tokens, GPU compute and prices.",
         "每日核验免费 AI Token、GPU 算力与价格。",
+    )
+    content = content.replace(
+        'aria-label="Star AI Resource Radar on GitHub"',
+        'aria-label="在 GitHub 上为 AI 免费资源雷达加星"',
     )
     content = content.replace("<strong>AI Resource Radar</strong>", "<strong>免费资源雷达</strong>", 1)
     content = content.replace('<a class="brand" href="./"', '<a class="brand" href="./zh/"', 1)

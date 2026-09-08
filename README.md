@@ -2,7 +2,7 @@
 
 # AI Resource Radar
 
-**Daily-verified global AI APIs, GPU compute, and prices—filtered by regional availability, signup requirements, and real integration steps.**
+**Find daily-verified free AI APIs and GPU compute that work in your country—no-card first, with official evidence and real setup steps.**
 
 [![CI](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/ci.yml/badge.svg)](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/ci.yml)
 [![Pages](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/pages.yml/badge.svg)](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/pages.yml)
@@ -18,11 +18,15 @@
 
 [How it works](#how-it-works) · [Public-site contract](docs/PUBLIC_SITE.md) · [Security](docs/SECURITY.md)
 
+[No-card free AI APIs](https://ai-resource-radar.github.io/ai-resource-radar/en/scenarios/free-ai-api-no-card/) · [Free GPU compute](https://ai-resource-radar.github.io/ai-resource-radar/en/scenarios/free-gpu-compute/) · [Mainland China support](https://ai-resource-radar.github.io/ai-resource-radar/en/scenarios/mainland-supported-free-ai-api/)
+
 </div>
 
 ![AI Resource Radar public overview with fresh sources and free AI offers](https://raw.githubusercontent.com/ai-resource-radar/ai-resource-radar/main/docs/assets/readme-public-overview.png)
 
 *The public radar exposes a current, read-only view without requiring an account or API key.*
+
+If the radar saves you research time, [star the repository](https://github.com/ai-resource-radar/ai-resource-radar) to help other developers find the maintained data.
 
 AI Resource Radar is a global-first, local-first tracker for free AI tiers, GPU compute, grants, and prices. It
 keeps the source and verification time beside each result, so the answer is practical: **what is
@@ -87,7 +91,6 @@ This project turns public source material into a small, explainable local databa
 | Provider profiles | 20 bilingual official pages with free policy, prices, evidence, and verified integrations |
 | Scenario pages and feeds | Six bilingual intent pages plus Atom/RSS snapshots with stable, public-only links |
 | Change detection | New offers, quota or restriction changes, removals, and upcoming expiry |
-| AI efficiency tips | Official guidance and manual articles stay pending until a human approves safe AGENTS.md application |
 
 ![OpenRouter provider profile with verified policy evidence and integration examples](https://raw.githubusercontent.com/ai-resource-radar/ai-resource-radar/main/docs/assets/readme-provider-openrouter.png)
 
