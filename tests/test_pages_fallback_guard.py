@@ -99,7 +99,7 @@ class PagesFallbackGuardTests(unittest.TestCase):
         with TemporaryDirectory() as temp:
             path = Path(temp) / "manifest.json"
             live_now = datetime.now(timezone.utc)
-            path.write_text(json.dumps(manifest(live_now - timedelta(hours=1))), encoding="utf-8")
+            path.write_text(json.dumps(manifest(live_now)), encoding="utf-8")
             eligible = subprocess.run(
                 [sys.executable, str(GUARD), str(path)],
                 check=False,
