@@ -150,6 +150,7 @@ def _check_commit(
     head_sha: str | None = None,
     actor: str | None = None,
     ref_type: str | None = None,
+    ref_name: str | None = None,
     default_branch: str | None = None,
 ) -> None:
     """Validate all commits introduced by ``base_sha..head_sha``.
@@ -162,7 +163,8 @@ def _check_commit(
 
     effective_actor = (actor if actor is not None else os.environ.get("GITHUB_ACTOR", "")).strip().casefold()
     effective_ref_type = (ref_type if ref_type is not None else os.environ.get("GITHUB_REF_TYPE", "")).strip().casefold()
-    effective_default_branch = default_branch if default_branch is not None else os.environ.get("GITHUB_DEFAULT_BRANCH")
+    effective_ref_name = (ref_name if ref_name is not None else os.environ.get("GITHUB_REF_NAME", "")).strip()
+    effective_default_branch = (default_branch if default_branch is not None else os.environ.get("GITHUB_DEFAULT_BRANCH", "")).strip()
     effective_base = base_sha
     if _is_zero_sha(effective_base) and effective_ref_type == "branch":
         effective_base = _new_branch_base(root, head_sha, effective_default_branch) or effective_base
@@ -188,11 +190,17 @@ def _check_commit(
     for sha, author_name, author_email, committer_name, committer_email in commits:
         author_email = author_email.strip().casefold()
         committer_email = committer_email.strip().casefold()
+        github_default_branch_commit = (
+            effective_ref_name == effective_default_branch
+            and author_email == LARRY_EMAIL
+            and committer_name.strip().casefold() == "github"
+            and committer_email == "noreply@github.com"
+        )
         if _looks_like_larry(author_name, author_email) and author_email != LARRY_EMAIL:
             errors.append(f"larry_author_identity_mismatch:{sha}")
         if _looks_like_larry(committer_name, committer_email) and committer_email != LARRY_EMAIL:
             errors.append(f"larry_committer_identity_mismatch:{sha}")
-        if enforce_actor_committer and committer_email != LARRY_EMAIL:
+        if enforce_actor_committer and committer_email != LARRY_EMAIL and not github_default_branch_commit:
             errors.append(f"larrynode_committer_identity_mismatch:{sha}")
 
 
@@ -222,6 +230,7 @@ def check(
     head_sha: str | None = None,
     actor: str | None = None,
     ref_type: str | None = None,
+    ref_name: str | None = None,
     default_branch: str | None = None,
 ) -> list[str]:
     errors: list[str] = []
@@ -260,6 +269,7 @@ def check(
         effective_head = head_sha if head_sha is not None else os.environ.get("GITHUB_SHA")
         effective_actor = actor if actor is not None else os.environ.get("GITHUB_ACTOR")
         effective_ref_type = ref_type if ref_type is not None else os.environ.get("GITHUB_REF_TYPE")
+        effective_ref_name = ref_name if ref_name is not None else os.environ.get("GITHUB_REF_NAME")
         effective_default_branch = default_branch if default_branch is not None else os.environ.get("GITHUB_DEFAULT_BRANCH")
         _check_commit(
             root,
@@ -268,6 +278,7 @@ def check(
             head_sha=effective_head,
             actor=effective_actor,
             ref_type=effective_ref_type,
+            ref_name=effective_ref_name,
             default_branch=effective_default_branch,
         )
     return sorted(set(errors))
@@ -280,6 +291,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--head-sha", dest="head_sha")
     parser.add_argument("--actor")
     parser.add_argument("--ref-type", dest="ref_type")
+    parser.add_argument("--ref-name", dest="ref_name")
     parser.add_argument("--default-branch", dest="default_branch")
     args = parser.parse_args(argv)
     root = Path(args.root).resolve()
@@ -289,6 +301,7 @@ def main(argv: list[str] | None = None) -> int:
         head_sha=args.head_sha,
         actor=args.actor,
         ref_type=args.ref_type,
+        ref_name=args.ref_name,
         default_branch=args.default_branch,
     )
     if errors:

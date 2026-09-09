@@ -141,6 +141,40 @@ class PrivacyGateTests(unittest.TestCase):
 
         self.assertTrue(any(error.startswith("larrynode_committer_identity_mismatch") for error in errors))
 
+    def test_default_branch_accepts_github_squash_committer_for_larry_author(self) -> None:
+        temporary, root, base = _git_repo()
+        self.addCleanup(temporary.cleanup)
+        head = _commit(root, "Larry", MODULE.LARRY_EMAIL, "GitHub", "noreply@github.com")
+
+        errors = MODULE.check(
+            root,
+            base_sha=base,
+            head_sha=head,
+            actor="larrynode",
+            ref_type="branch",
+            ref_name="main",
+            default_branch="main",
+        )
+
+        self.assertFalse(any(error.startswith("larrynode_committer_identity_mismatch") for error in errors))
+
+    def test_non_default_branch_rejects_github_squash_committer(self) -> None:
+        temporary, root, base = _git_repo()
+        self.addCleanup(temporary.cleanup)
+        head = _commit(root, "Larry", MODULE.LARRY_EMAIL, "GitHub", "noreply@github.com")
+
+        errors = MODULE.check(
+            root,
+            base_sha=base,
+            head_sha=head,
+            actor="larrynode",
+            ref_type="branch",
+            ref_name="feature",
+            default_branch="main",
+        )
+
+        self.assertTrue(any(error.startswith("larrynode_committer_identity_mismatch") for error in errors))
+
     def test_tag_range_with_external_history_does_not_apply_actor_rule_to_history(self) -> None:
         temporary, root, _base = _git_repo()
         self.addCleanup(temporary.cleanup)
