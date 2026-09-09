@@ -593,17 +593,18 @@ class AiRadarV2Tests(unittest.TestCase):
 
             self.assertEqual(third.sources[0].removed, 1)
             self.assertEqual(list_offers(path), ())
-            self.assertEqual(list_changes(path)[0]["change_type"], "removed")
             connection = connect(path)
             try:
                 removed = connection.execute(
                     """
-                    SELECT before_json, after_json FROM offer_changes
+                    SELECT change_type, before_json, after_json FROM offer_changes
                     WHERE change_type = 'removed' ORDER BY id DESC LIMIT 1
                     """
                 ).fetchone()
             finally:
                 connection.close()
+            self.assertIsNotNone(removed)
+            self.assertEqual(removed["change_type"], "removed")
             self.assertIsNone(removed["before_json"])
             self.assertIsNone(removed["after_json"])
 

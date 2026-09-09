@@ -28,6 +28,8 @@ class PublicWebTests(unittest.TestCase):
         self.assertIn("language-toggle", self.html)
         self.assertIn('class="github-cta"', self.html)
         self.assertIn('href="https://github.com/ai-resource-radar/ai-resource-radar"', self.html)
+        self.assertIn('aria-label="Star AI Resource Radar on GitHub"', self.html)
+        self.assertIn("Star on GitHub", self.html)
         self.assertIn('rel="noopener noreferrer"', self.html)
         self.assertIn('referrerpolicy="no-referrer"', self.html)
         self.assertNotIn("<form", self.html.lower())

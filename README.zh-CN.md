@@ -2,7 +2,7 @@
 
 # AI 免费资源雷达
 
-**每天核验全球免费 AI API、GPU 算力和价格，并按地区可用性、注册门槛和真实接入方式筛选。**
+**寻找在你所在地区真正可用的免费 AI API 与 GPU 算力：每日核验、无需信用卡优先，并保留官方证据与接入步骤。**
 
 [![CI](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/ci.yml/badge.svg)](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/ci.yml)
 [![Pages](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/pages.yml/badge.svg)](https://github.com/ai-resource-radar/ai-resource-radar/actions/workflows/pages.yml)
@@ -18,11 +18,15 @@
 
 [工作原理](#工作原理) · [公开站点说明](docs/PUBLIC_SITE.md) · [安全说明](docs/SECURITY.md)
 
+[无需信用卡的免费 AI API](https://ai-resource-radar.github.io/ai-resource-radar/zh/scenarios/free-ai-api-no-card/) · [免费 GPU 算力](https://ai-resource-radar.github.io/ai-resource-radar/zh/scenarios/free-gpu-compute/) · [中国大陆可用](https://ai-resource-radar.github.io/ai-resource-radar/zh/scenarios/mainland-supported-free-ai-api/)
+
 </div>
 
 ![AI 免费资源雷达公开站首页，展示最新来源与免费政策](https://raw.githubusercontent.com/ai-resource-radar/ai-resource-radar/main/docs/assets/readme-public-overview.png)
 
 *公开雷达无需登录或 API Key，提供最新的只读资源快照。*
+
+如果雷达帮你节省了查资料的时间，可以[为仓库加星](https://github.com/ai-resource-radar/ai-resource-radar)，让更多开发者找到这份持续维护的数据。
 
 AI 免费资源雷达是一个全球优先、同时保持本地隐私的免费 Token、GPU 算力、资助和价格追踪器。不只给出链接，还会直接说明
 **送什么、送多少、多久恢复、有哪些门槛，以及怎样开始使用**；每项结果都保留来源与核验时间。
@@ -79,7 +83,6 @@ GitHub Watch，不要把它当成每日资源订阅的替代品。
 | 服务商档案 | 20 个中英文官方页面，集中展示免费政策、价格、证据和已核验接入示例 |
 | 场景页与订阅 | 6 个双语意图页面，以及使用稳定公共链接的 Atom/RSS 快照 |
 | 变化检测 | 新增、额度变化、限制变化、下架和即将到期 |
-| AI 效率技巧 | 官方技巧与手动文章先进入候选，人工批准后安全写入全局或项目 AGENTS.md |
 
 ![OpenRouter 服务商详情页，展示已核验政策、官方证据和接入示例](https://raw.githubusercontent.com/ai-resource-radar/ai-resource-radar/main/docs/assets/readme-provider-openrouter.png)
 
