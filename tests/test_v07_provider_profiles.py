@@ -95,6 +95,17 @@ class ProviderProfileTests(unittest.TestCase):
         for slug in ("groq", "mistral-ai", "sambanova", "siliconflow", "zhipu-ai", "cerebras"):
             self.assertNotIn("codex", render_integration_snippets(slug))
 
+    def test_siliconflow_profile_uses_live_documentation_hosts(self) -> None:
+        profile = next(profile for profile in PROVIDER_PROFILES if profile.slug == "siliconflow")
+        self.assertEqual(
+            profile.docs_url,
+            "https://api-docs.siliconflow.cn/docs/userguide/quickstart",
+        )
+        self.assertEqual(
+            CURSOR_PROVIDER_DOCS["siliconflow"],
+            "https://docs.siliconflow.com/en/userguide/use-docs-with-cursor",
+        )
+
     def test_codex_template_targets_user_config_and_declares_responses(self) -> None:
         snippet = render_integration_snippets("openrouter")["codex"]
         self.assertIn("~/.codex/config.toml", snippet)

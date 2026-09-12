@@ -35,6 +35,14 @@ class V04SourceTests(unittest.TestCase):
             self.assertTrue(source.allowed_hosts)
             self.assertEqual(source.cadence_hours, 24)
 
+    def test_siliconflow_uses_current_cn_documentation_host(self) -> None:
+        source = SOURCE_BY_ID["siliconflow-free-models"]
+        self.assertEqual(
+            source.url,
+            "https://api-docs.siliconflow.cn/docs/userguide/faqs/rate-limit-and-upgradation",
+        )
+        self.assertEqual(source.allowed_hosts, ("api-docs.siliconflow.cn",))
+
     def test_official_fixture_presentations_are_bilingual_and_english_safe(self) -> None:
         for source_id in SOURCE_FIXTURES:
             with self.subTest(source_id=source_id):
@@ -66,6 +74,7 @@ class V04SourceTests(unittest.TestCase):
 
         siliconflow = self._records("siliconflow-free-models")[0]
         self.assertTrue(siliconflow.details["identity_verification_required"])
+        self.assertEqual(siliconflow.requires_identity_verification, "required")
         self.assertEqual(siliconflow.mainland_status, "supported")
         self.assertEqual(classify_offer(siliconflow)[0], "B")
 

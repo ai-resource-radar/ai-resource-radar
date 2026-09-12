@@ -27,7 +27,7 @@ OPENCLAW_PROVIDER_DOCS_URL = "https://docs.openclaw.ai/concepts/model-providers"
 CODEX_PROVIDER_DOCS_URL = "https://developers.openai.com/codex/config-reference"
 CURSOR_PROVIDER_DOCS: dict[str, str] = {
     "sambanova": "https://docs.sambanova.ai/docs/en/integrations/cursor",
-    "siliconflow": "https://docs.siliconflow.cn/cn/userguide/use-docs-with-cursor",
+    "siliconflow": "https://docs.siliconflow.com/en/userguide/use-docs-with-cursor",
 }
 API_KEY_URLS: dict[str, str] = {
     "openrouter": "https://openrouter.ai/settings/keys",
@@ -409,7 +409,7 @@ PROVIDER_PROFILES: tuple[ProviderProfile, ...] = (
         ("Silicon Flow", "硅基流动", "硅基流动 SiliconFlow"),
         ("siliconflow-free-models",),
         "https://siliconflow.cn/",
-        "https://docs.siliconflow.cn/",
+        "https://api-docs.siliconflow.cn/docs/userguide/quickstart",
         "https://api.siliconflow.cn/v1",
         "SILICONFLOW_API_KEY",
         "Qwen/Qwen2.5-7B-Instruct",

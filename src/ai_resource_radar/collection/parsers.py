@@ -808,6 +808,7 @@ def parse_siliconflow_free_models(payload: bytes, source: RadarSource) -> tuple[
             source_url=source.url,
             evidence_excerpt=_excerpt(text, "免费模型调用免费"),
             details={"identity_verification_required": True},
+            requires_identity_verification="required",
             input_modalities=("text", "image", "audio"),
             output_modalities=("text", "image", "audio"),
         ),
