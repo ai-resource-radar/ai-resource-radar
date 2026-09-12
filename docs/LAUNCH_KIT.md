@@ -60,17 +60,44 @@ AI 免费资源雷达是本地优先的免费 Token、GPU 算力、资助和价�
 问题会在发布前停止，旧站保持不变。你可以从 {LIVE_URL} 开始，下载 {DATA_URL}，或运行
 `uvx ai-resource-radar start --open`。接入前请阅读隐私、安全和迁移说明。
 
-## Candidate channels (inactive)
+## GitHub-native shortlist (reviewed 2026-09-12)
 
-No launch channel is currently approved. The entries below are planning notes, not permission to
-publish or submit anything.
+External GitHub directory submissions are not approved by this document. Re-read the destination's
+rules and recheck the live radar immediately before opening any pull request.
 
-| Candidate | Suggested angle and constraints |
-| --- | --- |
-| GitHub organization profile | One-sentence purpose plus the public radar URL; metadata edit requires separate approval. |
-| English developer community | Share one current comparison such as no-card APIs or free GPU options; disclose maintainer affiliation and re-read current community rules. |
-| Chinese developer community | Lead with mainland availability and registration requirements; avoid benefit guarantees and re-read current community rules. |
-| Curated resource list | Submit the public dataset or methodology only where it matches the list's current inclusion rules. |
+| Priority | Candidate | Decision and constraint |
+| --- | --- | --- |
+| 1 | `eudk/awesome-ai-tools` | Best current external fit under **LLM Ops**. It accepts public, usable developer tools, requires concise factual copy and asks contributors to disclose their connection. Its pull-request queue is large, so treat this as a durable backlink rather than an immediate traffic spike. |
+| 2 | GitHub organization profile | Publish the one-sentence profile below as a second first-party GitHub entry point. This is useful brand hygiene, not third-party endorsement. |
+| Later | `marcelscruz/dev-resources` | Strong developer audience, but its rules reject products hosted on shared `github.io` domains. Revisit only after the project has a custom domain. |
+| Later | `awesome-selfhosted/awesome-selfhosted-data` | Revisit after the first tagged release is at least four months old and the project clearly fits an existing self-hosted category. |
+| Skip | `mnfst/awesome-free-llm-apis` | Accepts API providers with permanent free LLM tiers, not comparison or monitoring tools. |
+| Skip | `public-apis` | The hosted snapshot is not a documented, self-serve product API and the current `github.io` host violates its custom-domain rule. |
+| Skip | `github/explore` | Curates topic and collection definitions rather than accepting individual project listings. The repository already has focused GitHub topics. |
+
+### Prepared `eudk/awesome-ai-tools` submission
+
+Target section: `LLM Ops`
+
+Entry:
+
+> [AI Resource Radar](https://github.com/ai-resource-radar/ai-resource-radar) - Open-source,
+> local-first tracker for daily-verified free AI APIs, GPU compute, grants, and normalized token/GPU
+> prices, with country and no-card filters plus official evidence.
+
+Pull request title:
+
+> Add AI Resource Radar to LLM Ops
+
+Pull request body:
+
+> Adds AI Resource Radar to the LLM Ops section. The project is public and usable now through its
+> hosted read-only radar or locally with `uvx`; it is MIT licensed and verifies provider claims
+> against official sources. Disclosure: I maintain this project. This submission was prepared with
+> an AI coding assistant.
+
+Submission gate: first deploy the SiliconFlow source repair, confirm a fresh publishable manifest,
+then recheck that the entry is still absent and that the contribution rules have not changed.
 
 ## Organization profile draft
 

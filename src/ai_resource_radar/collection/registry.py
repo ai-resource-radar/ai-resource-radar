@@ -186,13 +186,13 @@ SOURCES = (
     RadarSource(
         "siliconflow-free-models",
         "SiliconFlow Free Models",
-        "https://docs.siliconflow.cn/cn/userguide/rate-limits/rate-limit-and-upgradation",
+        "https://api-docs.siliconflow.cn/docs/userguide/faqs/rate-limit-and-upgradation",
         "official",
         "token",
         "official_page",
         24,
         "html",
-        ("docs.siliconflow.cn",),
+        ("api-docs.siliconflow.cn",),
     ),
     RadarSource(
         "alibaba-model-studio-trial",
