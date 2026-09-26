@@ -708,6 +708,11 @@ def parse_sambanova(payload: bytes, source: RadarSource) -> tuple[OfferObservati
     text = html_text(payload)
     _require(text, "SambaNova", "Free Tier", "no payment method", "RPM", "RPD", "TPD")
     free_section = text[text.casefold().find("production model rate limits") :]
+    # SambaNova's Mintlify documentation exposes the authoritative content as
+    # Markdown. Strip presentation-only table markers while retaining support
+    # for the legacy visible HTML table used by older snapshots.
+    free_section = re.sub(r"[|`*]+", " ", free_section)
+    free_section = re.sub(r"\s+", " ", free_section)
     matches = re.findall(
         r"((?:DeepSeek|Meta|OpenAI|Google)\s+)?"
         r"([A-Za-z0-9][A-Za-z0-9._-]{2,80})\s+20\s+20\s+200(?:,?000|K)\b",

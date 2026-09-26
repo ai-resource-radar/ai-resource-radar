@@ -158,8 +158,9 @@ SOURCES = (
         "token",
         "official_page",
         24,
-        "html",
+        "markdown",
         ("docs.sambanova.ai",),
+        fetch_url="https://docs.sambanova.ai/docs/en/models/rate-limits.md",
     ),
     RadarSource(
         "mistral-free-mode",

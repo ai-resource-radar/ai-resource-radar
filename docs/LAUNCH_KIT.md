@@ -75,7 +75,7 @@ rules and recheck the live radar immediately before opening any pull request.
 | Skip | `public-apis` | The hosted snapshot is not a documented, self-serve product API and the current `github.io` host violates its custom-domain rule. |
 | Skip | `github/explore` | Curates topic and collection definitions rather than accepting individual project listings. The repository already has focused GitHub topics. |
 
-### Prepared `eudk/awesome-ai-tools` submission
+### Existing `eudk/awesome-ai-tools` submission
 
 Target section: `LLM Ops`
 
@@ -96,8 +96,10 @@ Pull request body:
 > against official sources. Disclosure: I maintain this project. This submission was prepared with
 > an AI coding assistant.
 
-Submission gate: first deploy the SiliconFlow source repair, confirm a fresh publishable manifest,
-then recheck that the entry is still absent and that the contribution rules have not changed.
+Current status, checked 2026-09-26: pull request
+[`#625`](https://github.com/eudk/awesome-ai-tools/pull/625) is open and cleanly mergeable, with no
+maintainer comments or reviews. Do not bump or duplicate it. Re-read any future maintainer feedback
+and the contribution rules before changing the submitted entry.
 
 ## Organization profile draft
 
@@ -105,6 +107,73 @@ then recheck that the entry is still absent and that the contribution rules have
 > and official evidence. Browse the public radar without an account or API key.
 
 Homepage: `https://ai-resource-radar.github.io/ai-resource-radar/`
+
+## First community launch wave (reviewed 2026-09-26)
+
+Do not publish this wave until the SambaNova repair is merged and the live manifest reports the
+merged default-branch revision, `healthy`, `publishable: true`, and 23 fresh sources. The existing
+`eudk/awesome-ai-tools` pull request remains the slow, durable directory channel; do not bump it
+while it has no maintainer feedback.
+
+### 1. X from the independent project account
+
+Use `docs/assets/readme-public-overview.png` as the first image and
+`docs/assets/readme-provider-openrouter.png` as the second. Keep the institutional account separate:
+no repost, like, reply, or coordinated engagement.
+
+Draft:
+
+> Free AI tiers change fast, so I built AI Resource Radar: 23 daily source checks for free AI APIs,
+> GPU compute, grants, and prices—with country/no-card filters and evidence links. No signup.
+>
+> Live: https://ai-resource-radar.github.io/ai-resource-radar/
+> GitHub: https://github.com/ai-resource-radar/ai-resource-radar
+
+### 2. V2EX / 分享创造
+
+Use this as the first Chinese discussion channel because the project is immediately usable, the
+node explicitly welcomes newly created work, and a concrete feedback question fits better than a
+pure announcement.
+
+Title:
+
+> 做了一个每天核验 23 个公开来源的 AI 免费资源雷达，想听听大家最在意哪类资源
+
+Body:
+
+> 免费 API、GPU 额度和价格经常变化，普通收藏夹很快就过期，所以我做了 AI Resource
+> Radar：每天读取公开来源，保留证据和核验时间，并按国家、是否需要绑卡等条件筛选。
+>
+> 在线版：https://ai-resource-radar.github.io/ai-resource-radar/zh/
+>
+> GitHub：https://github.com/ai-resource-radar/ai-resource-radar
+>
+> 目前最想确认两件事：你找免费 AI 资源时最先看「额度、地区、是否绑卡」中的哪一项？还有哪些
+> 官方来源值得加入？欢迎直接提数据错误，项目里也有修正入口。
+
+### 3. Show HN after account warm-up
+
+Show HN currently limits submissions from accounts that are not yet familiar with the community.
+Treat it as the third channel, not an immediate launch. When eligible, submit the working public
+radar rather than a blog post, stay available for questions, and never solicit votes.
+
+Title:
+
+> Show HN: AI Resource Radar – daily checks for free AI APIs and GPU prices
+
+First comment:
+
+> I built this after repeatedly finding that saved free-tier pages had become outdated. The radar
+> checks allow-listed public sources, keeps the last trusted observation when one parser fails, and
+> publishes the source evidence and verification time. The hosted view needs no account; the same
+> data can also run locally. I would especially value feedback on missing official sources and on
+> whether the country/no-card filters answer the first decision you make.
+
+Rules to recheck immediately before publishing:
+
+- Show HN: https://news.ycombinator.com/showhn.html
+- V2EX 分享创造: https://www.v2ex.com/go/create
+- X link and image behavior: https://help.x.com/en/using-x/how-to-post
 
 ## Before any post
 

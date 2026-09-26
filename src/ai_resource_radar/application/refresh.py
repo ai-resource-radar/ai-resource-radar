@@ -121,16 +121,20 @@ def fetch_source(
     last_modified: str | None,
     timeout: float,
 ) -> FetchPayload:
-    parsed = urlparse(source.url)
+    request_url = source.fetch_url or source.url
+    parsed = urlparse(request_url)
     if parsed.scheme != "https" or parsed.hostname not in source.allowed_hosts:
         raise ValueError("source_not_allowlisted")
-    accept = "application/json" if source.format == "json" else "text/html"
+    accept = {
+        "json": "application/json",
+        "markdown": "text/markdown",
+    }.get(source.format, "text/html")
     headers = {"Accept": accept, "User-Agent": USER_AGENT}
     if etag:
         headers["If-None-Match"] = etag
     if last_modified:
         headers["If-Modified-Since"] = last_modified
-    request = Request(source.url, headers=headers, method="GET")
+    request = Request(request_url, headers=headers, method="GET")
     try:
         with urlopen(request, timeout=timeout) as response:
             content_length = response.headers.get("Content-Length")
