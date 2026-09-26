@@ -18,6 +18,7 @@ class RadarSource:
     cadence_hours: int
     format: str
     allowed_hosts: tuple[str, ...]
+    fetch_url: str | None = None
 
 
 def default_presentations(

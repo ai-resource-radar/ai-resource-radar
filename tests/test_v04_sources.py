@@ -3,7 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 import re
 import unittest
+from unittest.mock import patch
 
+from ai_resource_radar.application.refresh import fetch_source
 from ai_resource_radar.pricing import list_gpu_prices, list_token_prices
 from ai_resource_radar.sources import SOURCE_BY_ID, SOURCES, parse_source
 from ai_resource_radar.store import begin_run, classify_offer, connect, ingest_source
@@ -42,6 +44,55 @@ class V04SourceTests(unittest.TestCase):
             "https://api-docs.siliconflow.cn/docs/userguide/faqs/rate-limit-and-upgradation",
         )
         self.assertEqual(source.allowed_hosts, ("api-docs.siliconflow.cn",))
+
+    def test_sambanova_uses_mintlify_markdown_and_parses_free_tier_rows(self) -> None:
+        source = SOURCE_BY_ID["sambanova-free-tier"]
+        self.assertEqual(
+            source.url,
+            "https://docs.sambanova.ai/docs/en/models/rate-limits",
+        )
+        self.assertEqual(
+            source.fetch_url,
+            "https://docs.sambanova.ai/docs/en/models/rate-limits.md",
+        )
+        self.assertEqual(source.format, "markdown")
+        payload = b"""# SambaNova model rate limits
+Free Tier: Applied when there is no payment method linked with your account.
+RPM: Requests per minute. RPD: Requests per day. TPD: Tokens per day.
+## Production model rate limits
+| Developer | Model ID | RPM | RPD | TPD |
+| **DeepSeek** | `DeepSeek-V3.1` | 20 | 20 | 200000 |
+| **Meta** | `Meta-Llama-3.3-70B-Instruct` | 20 | 20 | 200000 |
+| **OpenAI** | `gpt-oss-120b` | 20 | 20 | 200000 |
+"""
+        records = parse_source(source, payload)
+        self.assertEqual(
+            [record.details["model_id"] for record in records],
+            ["DeepSeek-V3.1", "Meta-Llama-3.3-70B-Instruct", "gpt-oss-120b"],
+        )
+
+        class Response:
+            status = 200
+            headers: dict[str, str] = {}
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self, _limit: int) -> bytes:
+                return payload
+
+        with patch(
+            "ai_resource_radar.application.refresh.urlopen",
+            return_value=Response(),
+        ) as open_url:
+            fetched = fetch_source(source, None, None, 20)
+        request = open_url.call_args.args[0]
+        self.assertEqual(request.full_url, source.fetch_url)
+        self.assertEqual(request.get_header("Accept"), "text/markdown")
+        self.assertEqual(fetched.body, payload)
 
     def test_official_fixture_presentations_are_bilingual_and_english_safe(self) -> None:
         for source_id in SOURCE_FIXTURES:
