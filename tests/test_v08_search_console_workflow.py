@@ -53,11 +53,11 @@ class V080SearchConsoleWorkflowTests(unittest.TestCase):
         self.assertIn("feeds", self.public_site)
         self.assertIn("0.8.0", self.changelog)
 
-    def test_package_version_is_v090(self) -> None:
+    def test_package_version_is_v091(self) -> None:
         pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
         facade = (ROOT / "src/ai_resource_radar/__init__.py").read_text(encoding="utf-8")
-        self.assertIn('version = "0.9.0"', pyproject)
-        self.assertIn('__version__ = "0.9.0"', facade)
+        self.assertIn('version = "0.9.1"', pyproject)
+        self.assertIn('__version__ = "0.9.1"', facade)
         self.assertIn('PUBLIC_SCHEMA_VERSION = "1.4"', self.public_site_module)
 
 

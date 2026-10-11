@@ -119,9 +119,17 @@ RPM: Requests per minute. RPD: Requests per day. TPD: Tokens per day.
         self.assertEqual((mistral.offer_type, mistral.quota_value), ("variable_free", None))
         self.assertEqual(classify_offer(mistral)[0], "B")
 
-        huggingface = self._records("huggingface-inference-credits")[0]
-        self.assertEqual((huggingface.quota_value, huggingface.reset_period), (0.10, "monthly"))
-        self.assertEqual(classify_offer(huggingface)[0], "A")
+        self.assertEqual(self._records("huggingface-inference-credits"), ())
+
+        huggingface_legacy = parse_source(
+            SOURCE_BY_ID["huggingface-inference-credits"],
+            (FIXTURES / "huggingface_inference_credits_legacy.html").read_bytes(),
+        )[0]
+        self.assertEqual(
+            (huggingface_legacy.quota_value, huggingface_legacy.reset_period),
+            (0.10, "monthly"),
+        )
+        self.assertEqual(classify_offer(huggingface_legacy)[0], "A")
 
         siliconflow = self._records("siliconflow-free-models")[0]
         self.assertTrue(siliconflow.details["identity_verification_required"])

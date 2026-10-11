@@ -20,7 +20,7 @@ get and how to claim it: {LIVE_URL}.
 
 ### Medium (social post)
 
-Free tiers and GPU prices move faster than a bookmark list. AI Resource Radar v0.9.0 runs deterministic
+Free tiers and GPU prices move faster than a bookmark list. AI Resource Radar v0.9.1 runs deterministic
 public-source checks, keeps the last trusted value when a parser drifts, and publishes a small JSON
 snapshot plus a human-friendly radar. Browse {LIVE_URL}, inspect {DATA_URL}, or run it locally with
 `uvx ai-resource-radar start --open`. MIT licensed, local-first, and no account data is
@@ -30,7 +30,7 @@ needed for collection.
 
 AI Resource Radar is a local-first tracker for free AI tokens, GPU compute, grants, and normalized
 prices. Its source-specific parsers retain evidence and verification time, distinguish official
-facts from community leads, and report changes instead of hiding them in a score. v0.9.0 keeps the
+facts from community leads, and report changes instead of hiding them in a score. v0.9.1 keeps the
 collection and public snapshot focused on free resources and prices while adding country-level
 availability and explicit signup requirements.
 The public Pages view and documented JSON schema remain keyless: a single
@@ -47,7 +47,7 @@ AI 免费资源雷达每天核验公开的免费 Token、GPU 算力和价格变�
 
 ### 中文中等文案（社交平台）
 
-免费额度和 GPU 价格变化很快，收藏夹很容易过期。AI 免费资源雷达 v0.9.0 用确定性脚本核验公开来源，
+免费额度和 GPU 价格变化很快，收藏夹很容易过期。AI 免费资源雷达 v0.9.1 用确定性脚本核验公开来源，
 解析器漂移时保留最后可信值，并发布可核对的 JSON 快照和可读榜单。访问 {LIVE_URL}、查看 {DATA_URL}，
 或用 `uvx ai-resource-radar start --open` 本地运行。采集不需要账号信息，项目采用 MIT 许可证。
 
@@ -96,7 +96,7 @@ Pull request body:
 > against official sources. Disclosure: I maintain this project. This submission was prepared with
 > an AI coding assistant.
 
-Current status, checked 2026-09-26: pull request
+Current status, checked 2026-10-11: pull request
 [`#625`](https://github.com/eudk/awesome-ai-tools/pull/625) is open and cleanly mergeable, with no
 maintainer comments or reviews. Do not bump or duplicate it. Re-read any future maintainer feedback
 and the contribution rules before changing the submitted entry.
@@ -121,6 +121,11 @@ Use `docs/assets/readme-public-overview.png` as the first image and
 `docs/assets/readme-provider-openrouter.png` as the second. Keep the institutional account separate:
 no repost, like, reply, or coordinated engagement.
 
+Observed outcome, checked 2026-10-11: the screenshot post reached 9 views and 1 like; the later
+content-led post reached 2 impressions, 1 detail expansion, and 0 link clicks. GitHub traffic did
+not expose an X referrer. Do not repeat the same format; the next X post should lead with a concrete
+verified change after v0.9.1 is public.
+
 Draft:
 
 > Free AI tiers change fast, so I built AI Resource Radar: 23 daily source checks for free AI APIs,
@@ -137,12 +142,14 @@ pure announcement.
 
 Title:
 
-> 做了一个每天核验 23 个公开来源的 AI 免费资源雷达，想听听大家最在意哪类资源
+> 做了一个每天核验 23 个公开来源的 AI 资源雷达，最近发现 Hugging Face 免费额度取消了
 
 Body:
 
 > 免费 API、GPU 额度和价格经常变化，普通收藏夹很快就过期，所以我做了 AI Resource
-> Radar：每天读取公开来源，保留证据和核验时间，并按国家、是否需要绑卡等条件筛选。
+> Radar：每天读取公开来源，保留证据和核验时间，并按国家、是否需要绑卡等条件筛选。最近
+> Hugging Face 官方把 Free Users 的 Inference Providers 月度额度从 `$0.10` 改成了 `None`，
+> 雷达先保留旧的可信记录并标记待核验，连续确认后才下架，避免页面临时异常造成误删。
 >
 > 在线版：https://ai-resource-radar.github.io/ai-resource-radar/zh/
 >
@@ -151,7 +158,15 @@ Body:
 > 目前最想确认两件事：你找免费 AI 资源时最先看「额度、地区、是否绑卡」中的哪一项？还有哪些
 > 官方来源值得加入？欢迎直接提数据错误，项目里也有修正入口。
 
-### 3. Show HN after account warm-up
+### 3. Next X post after v0.9.1
+
+> One free AI tier disappeared: Hugging Face now lists no included monthly Inference
+> Providers credits for Free Users. AI Resource Radar detected the official change, failed closed,
+> and only retires the old record after two successful confirmations.
+>
+> Evidence and current alternatives: https://ai-resource-radar.github.io/ai-resource-radar/en/
+
+### 4. Show HN after account warm-up
 
 Show HN currently limits submissions from accounts that are not yet familiar with the community.
 Treat it as the third channel, not an immediate launch. When eligible, submit the working public
