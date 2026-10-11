@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.9.1 — Unreleased
+## 0.9.1 — 2026-10-11
 
 - Recognize Hugging Face's current official pricing table, which now lists no included monthly
   Inference Providers credits for free users, and retire the former `$0.10` offer only after the
