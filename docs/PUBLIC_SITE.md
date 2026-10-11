@@ -31,7 +31,7 @@ and is never published.
 {
   "schema_version": "1.4",
   "dataset": "ai-resource-radar-public",
-  "package_version": "0.9.0",
+  "package_version": "0.9.1",
   "default_language": "en",
   "supported_languages": ["en", "zh-CN"],
   "region_model_version": "2026-08-14.v1",

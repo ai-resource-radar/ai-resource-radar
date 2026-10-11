@@ -771,6 +771,19 @@ def parse_mistral_free_mode(payload: bytes, source: RadarSource) -> tuple[OfferO
 
 def parse_huggingface_inference_credits(payload: bytes, source: RadarSource) -> tuple[OfferObservation, ...]:
     text = html_text(payload)
+    retired_free_tier = re.search(
+        r"\bFree Users\s+None\s+-\s+yes\s+\(credits purchase required\)",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if retired_free_tier:
+        _require(
+            text,
+            "Included Monthly Credits",
+            "Free users can use Inference Providers by purchasing credits",
+        )
+        return ()
+
     _require(text, "Free Credits to Get Started", "Free Users", "$0.10", "subject to change")
     return (
         _official_offer(

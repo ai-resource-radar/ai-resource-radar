@@ -161,7 +161,7 @@ class PublicSiteTests(unittest.TestCase):
             public_text = "\n".join(path.read_text(encoding="utf-8") for path in (site / "data").rglob("*.json"))
             self.assertEqual(manifest["schema_version"], "1.4")
             self.assertEqual(manifest["dataset"], "ai-resource-radar-public")
-            self.assertEqual(manifest["package_version"], "0.9.0")
+            self.assertEqual(manifest["package_version"], "0.9.1")
             self.assertEqual(manifest["default_language"], "en")
             self.assertEqual(manifest["supported_languages"], ["en", "zh-CN"])
             self.assertEqual(manifest["region_model_version"], "2026-08-14.v1")
