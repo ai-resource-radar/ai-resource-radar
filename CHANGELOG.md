@@ -5,6 +5,8 @@
 - Recognize Hugging Face's current official pricing table, which now lists no included monthly
   Inference Providers credits for free users, and retire the former `$0.10` offer only after the
   existing two-success confirmation guard.
+- Let the Pages publication gate validate the dynamically published bilingual scenario set instead
+  of requiring evidence-thin scenarios to remain online.
 - Restore deterministic collection after the SiliconFlow and SambaNova documentation changes while
   preserving canonical evidence URLs and fail-closed parser behavior.
 - Improve repository and public-site discovery with clearer GitHub entry points, launch materials,

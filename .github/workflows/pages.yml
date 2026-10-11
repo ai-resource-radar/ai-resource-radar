@@ -161,6 +161,7 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
+          from urllib.parse import urlparse
 
           root = Path("_site")
           index = root / "index.html"
@@ -205,11 +206,39 @@ jobs:
               scenario_routes = scenario_pages.get("pages") or scenario_pages.get("urls") or []
               scenario_count = scenario_pages.get("count", len(scenario_routes))
           elif isinstance(scenario_pages, list):
+              scenario_routes = scenario_pages
               scenario_count = len(scenario_pages)
           else:
+              scenario_routes = []
               scenario_count = 0
-          if int(scenario_count or 0) != 12:
+          scenario_count = int(scenario_count or 0)
+          if (
+              len(scenario_routes) != scenario_count
+              or scenario_count < 2
+              or scenario_count > 12
+              or scenario_count % 2
+          ):
               raise SystemExit("pages_gate_scenario_pages")
+          if int((payload.get("counts") or {}).get("scenario_pages") or 0) != scenario_count:
+              raise SystemExit("pages_gate_scenario_count_mismatch")
+          scenario_locales = {}
+          scenario_assets = []
+          site_prefix = "/ai-resource-radar/"
+          for route in scenario_routes:
+              route_path = urlparse(str(route)).path
+              if not route_path.startswith(site_prefix):
+                  raise SystemExit(f"pages_gate_invalid_scenario_route:{route}")
+              relative = route_path.removeprefix(site_prefix).strip("/")
+              parts = relative.split("/")
+              if len(parts) != 3 or parts[0] not in {"zh", "en"} or parts[1] != "scenarios":
+                  raise SystemExit(f"pages_gate_invalid_scenario_route:{route}")
+              locale, _, scenario_slug = parts
+              scenario_locales.setdefault(scenario_slug, set()).add(locale)
+              scenario_assets.extend(
+                  (f"{relative}/index.html", f"{relative}/confirm/index.html")
+              )
+          if any(locales != {"zh", "en"} for locales in scenario_locales.values()):
+              raise SystemExit("pages_gate_scenario_locale_pair")
           feeds = payload.get("feeds")
           if isinstance(feeds, dict):
               feed_count = sum(
@@ -232,21 +261,10 @@ jobs:
               "data/providers.json", "data/integrations.json", "data/featured.json",
               "zh/providers/openrouter/index.html", "en/providers/openrouter/index.html",
               "feed.xml", "rss.xml", "en/feed.xml", "en/rss.xml",
-              "zh/scenarios/free-ai-api-no-card/index.html",
-              "en/scenarios/free-ai-api-no-card/index.html",
-              "zh/scenarios/recurring-free-ai-api/index.html",
-              "en/scenarios/recurring-free-ai-api/index.html",
-              "zh/scenarios/free-gpu-compute/index.html",
-              "en/scenarios/free-gpu-compute/index.html",
-              "zh/scenarios/mainland-supported-free-ai-api/index.html",
-              "en/scenarios/mainland-supported-free-ai-api/index.html",
-              "zh/scenarios/free-image-generation-api/index.html",
-              "en/scenarios/free-image-generation-api/index.html",
-              "zh/scenarios/openai-compatible-free-ai-api/index.html",
-              "en/scenarios/openai-compatible-free-ai-api/index.html",
+              *scenario_assets,
           ):
               if not (root / required).is_file():
-                  raise SystemExit(f"pages_gate_missing_v07_asset:{required}")
+                  raise SystemExit(f"pages_gate_missing_public_asset:{required}")
           print(f"public site gate: {status}")
           print(f"files: {payload.get('files', [])}")
           print(f"source health: {payload.get('source_health', {})}")
